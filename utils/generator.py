@@ -117,7 +117,6 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
     Returns:
         str: 생성된 답변
     """
-    inputs.pop("token_type_ids", None)
     
     if max_length is None:
         max_length = config.MAX_GENERATION_LENGTH
@@ -133,6 +132,8 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
             max_length=config.MAX_INPUT_LENGTH,
             padding=True
         )
+        
+        inputs.pop("token_type_ids", None)
         
         # GPU 사용 가능하면 GPU로 이동
         device = next(model.parameters()).device
@@ -182,8 +183,6 @@ def generate_streaming_answer(prompt: str, model, tokenizer, max_length: int = N
     Yields:
         str: 생성되는 토큰들
     """
-
-    inputs.pop("token_type_ids", None)
     
     if max_length is None:
         max_length = config.MAX_GENERATION_LENGTH
@@ -192,6 +191,7 @@ def generate_streaming_answer(prompt: str, model, tokenizer, max_length: int = N
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=config.MAX_INPUT_LENGTH)
         device = next(model.parameters()).device
         inputs = {k: v.to(device) for k, v in inputs.items()}
+        inputs.pop("token_type_ids", None)
         
         with torch.no_grad():
             # 스트리밍을 위한 설정
