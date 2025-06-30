@@ -98,110 +98,6 @@ with st.sidebar:
     st.markdown("- 🇨🇳 중국어 (Chinese)")
     st.markdown("- 🇻🇳 베트남어 (Vietnamese)")
     
-    # 배포 모드 상태 표시
-    st.markdown("---")
-    st.markdown("### ⚡ 시스템 상태")
-    
-    # Streamlit Cloud 특별 표시
-    if config.STREAMLIT_CLOUD:
-        st.info("☁️ Streamlit Cloud")
-        st.caption("경량 모델 사용 중")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("💾 메모리", "제한됨")
-        with col2:
-            st.metric("🚀 모드", "경량화")
-        
-        with st.expander("ℹ️ Streamlit Cloud 정보"):
-            st.markdown("""
-            - **메모리 제한**: 1GB
-            - **경량 모델**: 성능 최적화됨
-            - **무료 호스팅**: 24/7 서비스
-            """)
-            
-    elif is_deployment_ready():
-        # 프로덕션 모드
-        st.success("🚀 프로덕션 모드")
-        st.info("⚡ 사전 구축 완료")
-        st.metric("🎯 모드", "즉시 시작", help="모든 모델이 사전 구축되어 즉시 시작")
-        
-        # 배포 정보
-        marker_file = config.BASE_DIR / ".deployment_ready"
-        if marker_file.exists():
-            try:
-                import json
-                with open(marker_file, 'r') as f:
-                    data = json.load(f)
-                    setup_version = data.get("setup_version", "unknown")
-                    st.caption(f"Setup v{setup_version}")
-            except:
-                pass
-    else:
-        # 개발 모드
-        st.warning("🔨 개발 모드")
-        st.info("📦 런타임 구축")
-        
-        if 'app_fully_initialized' in st.session_state:
-            st.success("✅ 캐시 활성화됨")
-            
-            # 캐시 초기화 버튼 (개발 모드에서만)
-            if st.button("🔄 캐시 초기화", help="문제 발생시에만 사용하세요"):
-                # 모든 캐시 클리어
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-                st.cache_resource.clear()
-                st.rerun()
-        else:
-            st.warning("⏳ 초기화 중...")
-        
-        # 개발 도구
-        with st.expander("🛠️ 개발 도구"):
-            st.markdown("**프로덕션 모드로 전환하려면:**")
-            st.code("python setup_models.py", language="bash")
-            st.markdown("실행 후 앱을 재시작하세요.")
-
-    
-    # 성능 정보
-    st.markdown("### 📊 성능 정보")
-    
-    if config.STREAMLIT_CLOUD:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("⚡ 시작 시간", "< 10초")
-        with col2:
-            st.metric("🧠 모델", "경량화")
-    elif is_deployment_ready():
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("🚀 시작 시간", "< 5초")
-        with col2:
-            st.metric("💾 저장 공간", "최적화됨")
-    else:
-        col1, col2 = st.columns(2)
-        with col1:
-            if 'app_fully_initialized' in st.session_state:
-                st.metric("⚡ 시작 시간", "10-15초")
-            else:
-                st.metric("⏳ 첫 시작", "2-3분")
-        with col2:
-            device = "GPU" if torch.cuda.is_available() else "CPU"
-            st.metric("💻 처리 장치", device)
-    
-    # 저장 공간 정보
-    if 'app_fully_initialized' in st.session_state and not config.STREAMLIT_CLOUD:
-        st.markdown("### 📊 데이터 현황")
-        model_path = config.CHINESE_MODEL_LOCAL_PATH
-        if model_path.exists():
-            try:
-                size_mb = sum(f.stat().st_size for f in model_path.rglob('*') if f.is_file()) / (1024*1024)
-                st.info(f"💾 모델 크기: {size_mb:.1f}MB")
-            except:
-                st.info("💾 모델이 저장됨")
-        
-        # 인덱스 상태
-        if (config.CN_FAISS_INDEX_PATH.exists() and config.VN_FAISS_INDEX_PATH.exists()):
-            st.info("🔍 검색 인덱스: 준비됨")
 
 # 메인 콘텐츠
 def main():
@@ -244,6 +140,13 @@ def main():
                 st.session_state.generation_ready  = True
                 st.session_state.chinese_model     = chinese_model
                 st.session_state.vietnamese_model  = vietnamese_model
+                st.session_state.embed_model   = embed_model
+                st.session_state.cn_index      = cn_index
+                st.session_state.cn_passages   = cn_passages
+                st.session_state.cn_metadata   = cn_metadata
+                st.session_state.vn_index      = vn_index
+                st.session_state.vn_passages   = vn_passages
+                st.session_state.vn_metadata   = vn_metadata
                             
                 from utils.common import mark_deployment_ready
                 mark_deployment_ready() 
@@ -366,7 +269,7 @@ def process_question(question: str):
     """질문 처리 및 답변 생성"""
     if 'vn_index' not in st.session_state or 'cn_index' not in st.session_state:
         st.warning("🔄 시스템이 아직 완전히 초기화되지 않았습니다. 잠시만 기다려 주세요.")
-    return
+        return
     
     try:
         # 언어 감지
