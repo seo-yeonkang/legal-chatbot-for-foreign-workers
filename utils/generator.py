@@ -14,10 +14,6 @@ import faiss
 import pickle
 import json
 
-bos_id = None
-
-if model.config.model_type in ("t5", "mt5"):       # viT5, mT5 등
-    bos_id = tokenizer.convert_tokens_to_ids("<pad>")
 
 # SentenceTransformer는 필요할 때만 import (circular import 방지)
 def get_sentence_transformer():
@@ -137,12 +133,16 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
             max_length=config.MAX_INPUT_LENGTH,
             padding=True
         )
-        
-        inputs.pop("token_type_ids", None)
-        
+
         # GPU 사용 가능하면 GPU로 이동
         device = next(model.parameters()).device
         inputs = {k: v.to(device) for k, v in inputs.items()}
+        inputs.pop("token_type_ids", None)
+
+        bos_id = None
+
+        if model.config.model_type in ("t5", "mt5"):       # viT5, mT5 등
+            bos_id = tokenizer.convert_tokens_to_ids("<pad>")
         
         # 답변 생성
         with torch.no_grad():
