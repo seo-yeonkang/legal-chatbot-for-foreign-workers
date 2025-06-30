@@ -145,19 +145,19 @@ def main():
     with col1:
         st.markdown("**🇨🇳 中文示例**")
         st.button(
-            "我可以在韩国工作多长时间？",
+            "外国人工作地点变更条件是什么？",
             key="zh_example",
             on_click=set_example,
-            args=("我可以在韩国工作多长时间？",)
+            args=("外国人工作地点变更条件是什么？",)
         )
     
     with col2:
         st.markdown("**🇻🇳 Tiếng Việt**")
         st.button(
-            "Tôi có thể làm việc ở Hàn Quốc trong bao lâu?",
+            "Điều kiện thay đổi nơi làm việc của người nước ngoài là gì?",
             key="vi_example",
             on_click=set_example,
-            args=("Tôi có thể làm việc ở Hàn Quốc trong bao lâu?",)
+            args=("Điều kiện thay đổi nơi làm việc của người nước ngoài là gì?",)
         )
     
     # ▶︎ 이제 텍스트 입력 위젯을 **버튼 아래** 또는 위젯 생성 뒤 값 읽기만
