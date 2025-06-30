@@ -11,35 +11,56 @@ import streamlit as st
 from pathlib import Path
 import config
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_embeddings_and_index():
     """
-    언어별 임베딩 모델과 FAISS 인덱스 로드
+    언어별 임베딩 모델과 FAISS 인덱스 로드 (강화된 캐싱)
     
     Returns:
         tuple: (embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata)
     """
+    
+    # session_state 이중 캐싱 확인
+    if 'embedding_system_loaded' in st.session_state and st.session_state.embedding_system_loaded:
+        st.info("⚡ 캐시된 임베딩 시스템을 사용합니다.")
+        return (st.session_state.embed_model, st.session_state.cn_index, st.session_state.cn_passages, 
+                st.session_state.cn_metadata, st.session_state.vn_index, st.session_state.vn_passages, 
+                st.session_state.vn_metadata)
+    
     try:
         # 임베딩 모델 로드 (공통)
-        embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
+        with st.spinner("🔄 임베딩 모델 로드 중..."):
+            embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
         
         # 중국어 인덱스 로드
-        cn_index, cn_passages, cn_metadata = load_language_index(
-            embedding_model, 
-            'zh',
-            config.CN_LAW_DATA_PATH,
-            config.CN_FAISS_INDEX_PATH,
-            config.CN_PASSAGES_PATH
-        )
+        with st.spinner("🔄 중국어 법률 데이터 준비 중..."):
+            cn_index, cn_passages, cn_metadata = load_language_index(
+                embedding_model, 
+                'zh',
+                config.CN_LAW_DATA_PATH,
+                config.CN_FAISS_INDEX_PATH,
+                config.CN_PASSAGES_PATH
+            )
         
         # 베트남어 인덱스 로드
-        vn_index, vn_passages, vn_metadata = load_language_index(
-            embedding_model,
-            'vi', 
-            config.VN_LAW_DATA_PATH,
-            config.VN_FAISS_INDEX_PATH,
-            config.VN_PASSAGES_PATH
-        )
+        with st.spinner("🔄 베트남어 법률 데이터 준비 중..."):
+            vn_index, vn_passages, vn_metadata = load_language_index(
+                embedding_model,
+                'vi', 
+                config.VN_LAW_DATA_PATH,
+                config.VN_FAISS_INDEX_PATH,
+                config.VN_PASSAGES_PATH
+            )
+        
+        # session_state에 저장 (이중 캐싱)
+        st.session_state.embed_model = embedding_model
+        st.session_state.cn_index = cn_index
+        st.session_state.cn_passages = cn_passages
+        st.session_state.cn_metadata = cn_metadata
+        st.session_state.vn_index = vn_index
+        st.session_state.vn_passages = vn_passages
+        st.session_state.vn_metadata = vn_metadata
+        st.session_state.embedding_system_loaded = True
         
         return embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata
         
