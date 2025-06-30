@@ -20,45 +20,51 @@ def get_sentence_transformer():
     from sentence_transformers import SentenceTransformer
     return SentenceTransformer
 
+
 def download_chinese_model_from_gdrive():
-    """구글 드라이브에서 중국어 모델 다운로드"""
+    """Google Drive ZIP → 다운로드 → 압축 해제 → 최상단에 가중치 배치"""
     try:
-        # 이미 모델이 있는지 확인
+        # 이미 풀려 있으면 바로 반환
         if config.CHINESE_MODEL_LOCAL_PATH.exists():
-            st.info("🔄 중국어 모델이 이미 로컬에 있습니다.")
             return str(config.CHINESE_MODEL_LOCAL_PATH)
         
-        # 모델 디렉토리 생성
         config.MODELS_DIR.mkdir(exist_ok=True)
-        
-        # 구글 드라이브에서 폴더 다운로드
-        st.info("📥 구글 드라이브에서 중국어 모델 폴더를 다운로드하고 있습니다...")
-        
-        # 방법 1: 폴더를 ZIP으로 압축했다면
-        # url = f"https://drive.google.com/uc?id={config.CHINESE_MODEL_GDRIVE_ID}"
-        # gdown.download(url, str(config.CHINESE_MODEL_ZIP_PATH), quiet=False)
-        
-        # 방법 2: 폴더 직접 다운로드 (권장)
-        folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
-        gdown.download_folder(folder_url, output=str(config.MODELS_DIR), quiet=False)
-        
-        # 다운로드된 폴더명을 chinese_model로 변경 (필요시)
-        downloaded_folder = config.MODELS_DIR / "chinese_model"
-        if not downloaded_folder.exists():
-            # gdown이 다른 이름으로 폴더를 만들었을 수 있음
+
+        zip_path = config.CHINESE_MODEL_ZIP_PATH
+        if not zip_path.exists():
+            st.info("📥 중국어 모델 ZIP 다운로드 중…")
+            url = f"https://drive.google.com/uc?id={config.CHINESE_MODEL_GDRIVE_ID}"
+            gdown.download(url, str(zip_path), quiet=False, fuzzy=True)  # fuzzy=True 안전
+
+        # 압축 해제
+        st.info("🗜️ ZIP 압축 해제 중…")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(config.MODELS_DIR)
+
+        # 압축 안에 chinese_model/ 폴더가 들어있다고 가정
+        if not config.CHINESE_MODEL_LOCAL_PATH.exists():
+            # case: ZIP 내부 폴더명이 다르면 첫 폴더를 chinese_model 로 변경
             for folder in config.MODELS_DIR.iterdir():
                 if folder.is_dir() and folder.name != "chinese_model":
-                    folder.rename(downloaded_folder)
+                    folder.rename(config.CHINESE_MODEL_LOCAL_PATH)
                     break
-        
-        st.success("✅ 중국어 모델 다운로드 완료!")
-        return str(config.CHINESE_MODEL_LOCAL_PATH)
-        
-    except Exception as e:
-        st.error(f"❌ 모델 다운로드 실패: {str(e)}")
-        st.info("💡 수동 다운로드 방법: 구글 드라이브에서 폴더를 다운로드하고 models/chinese_model 경로에 압축 해제하세요.")
-        return None
 
+        # (옵션) 가중치가 서브폴더에 있으면 끌어올리기
+        for root, _, files in os.walk(config.CHINESE_MODEL_LOCAL_PATH):
+            for fn in files:
+                if fn.endswith((".bin", ".safetensors")):
+                    src = Path(root) / fn
+                    dst = config.CHINESE_MODEL_LOCAL_PATH / fn
+                    if not dst.exists():
+                        src.replace(dst)
+
+        st.success("✅ 중국어 모델 준비 완료!")
+        return str(config.CHINESE_MODEL_LOCAL_PATH)
+
+    except Exception as e:
+        st.error(f"❌ 중국어 모델 다운로드/설치 실패: {e}")
+        return None
+        
 @st.cache_resource
 def load_generation_models():
     """생성 모델들 로드 (구글 드라이브 + 외부 모델)"""
