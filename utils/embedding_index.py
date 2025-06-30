@@ -11,6 +11,30 @@ import streamlit as st
 from pathlib import Path
 import config
 
+def load_prebuilt_models():
+    """사전 구축된 모델들을 즉시 로드"""
+    try:
+        # 중국어 모델 로드 (로컬에서)
+        chinese_model = AutoModelForSeq2SeqLM.from_pretrained(
+            str(config.CHINESE_MODEL_LOCAL_PATH),
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto" if torch.cuda.is_available() else None,
+            local_files_only=True
+        )
+        
+        # 베트남어 모델 로드 (캐시에서)
+        vietnamese_model = AutoModelForSeq2SeqLM.from_pretrained(
+            config.VIETNAMESE_MODEL,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto" if torch.cuda.is_available() else None
+        )
+        
+        return chinese_model, vietnamese_model
+        
+    except Exception as e:
+        st.error(f"사전 구축된 모델 로드 실패: {str(e)}")
+        return None, None
+
 @st.cache_resource(show_spinner=False)
 def load_embeddings_and_index():
     """
@@ -76,6 +100,20 @@ def load_embeddings_and_index():
         except Exception as e:
             st.error(f"임베딩 시스템 로드 실패: {str(e)}")
             return None, None, None, None, None, None, None
+
+# is_deployment_ready 함수 추가 (generator.py에서 이동)
+def is_deployment_ready():
+    """배포 준비가 완료되었는지 확인"""
+    marker_file = config.BASE_DIR / ".deployment_ready"
+    if marker_file.exists():
+        try:
+            import json
+            with open(marker_file, 'r') as f:
+                data = json.load(f)
+                return data.get("deployment_complete", False)
+        except:
+            return False
+    return False
 
 def load_language_index(embedding_model, language, jsonl_path, faiss_path, passages_path):
     """특정 언어의 인덱스 로드"""
@@ -207,6 +245,57 @@ def search_similar_passages(embedding_model, faiss_index, passages, query: str, 
     Returns:
         list: 검색된 문서들
     """
+    if k is None:
+        k = config.MAX_RETRIEVED_DOCS
+    
+    try:
+        # 쿼리 임베딩
+        query_embedding = embedding_model.encode([query])
+        
+        # 유사도 검색
+        distances, indices = faiss_index.search(query_embedding.astype('float32'), k)
+        
+        # 결과 반환
+        retrieved_docs = []
+        for i, idx in enumerate(indices[0]):
+            if idx < len(passages):
+                retrieved_docs.append({
+                    'text': passages[idx],
+                    'score': float(distances[0][i]),
+                    'index': int(idx)
+                })
+        
+        return retrieved_docs
+        
+    except Exception as e:
+        st.error(f"검색 실패: {str(e)}")
+        return []
+
+def load_prebuilt_indexes():
+    """사전 구축된 인덱스들을 즉시 로드"""
+    try:
+        # 임베딩 모델
+        embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
+        
+        # 중국어 인덱스 로드
+        cn_index = faiss.read_index(str(config.CN_FAISS_INDEX_PATH))
+        with open(config.CN_PASSAGES_PATH, 'rb') as f:
+            cn_data = pickle.load(f)
+            cn_passages = cn_data['passages']
+            cn_metadata = cn_data['metadata']
+        
+        # 베트남어 인덱스 로드
+        vn_index = faiss.read_index(str(config.VN_FAISS_INDEX_PATH))
+        with open(config.VN_PASSAGES_PATH, 'rb') as f:
+            vn_data = pickle.load(f)
+            vn_passages = vn_data['passages']
+            vn_metadata = vn_data['metadata']
+        
+        return embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata
+        
+    except Exception as e:
+        st.error(f"사전 구축된 인덱스 로드 실패: {str(e)}")
+        return None, None, None, None, None, None, None
     if k is None:
         k = config.MAX_RETRIEVED_DOCS
     
