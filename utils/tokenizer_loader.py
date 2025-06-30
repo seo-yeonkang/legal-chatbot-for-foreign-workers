@@ -9,7 +9,7 @@ import config
 @st.cache_resource
 def load_tokenizer(language: str):
     """
-    언어에 따른 토크나이저 로드
+    언어에 따른 토크나이저 로드 (강화된 캐싱)
     
     Args:
         language (str): 'zh' (중국어) 또는 'vi' (베트남어)
@@ -21,7 +21,7 @@ def load_tokenizer(language: str):
         if language == "zh":
             # 중국어 - 로컬 다운로드된 모델에서 토크나이저 로드
             if not config.CHINESE_MODEL_LOCAL_PATH.exists():
-                st.error("중국어 모델이 다운로드되지 않았습니다.")
+                st.warning("중국어 모델이 다운로드되지 않았습니다. 잠시만 기다려주세요...")
                 return None
                 
             tokenizer = AutoTokenizer.from_pretrained(
@@ -33,11 +33,14 @@ def load_tokenizer(language: str):
             if hasattr(tokenizer, 'src_lang'):
                 tokenizer.src_lang = "zh_CN"
                 tokenizer.tgt_lang = "zh_CN"
+            
+            st.success("✅ 중국어 토크나이저 로드 완료")
             return tokenizer
             
         elif language == "vi":
             # 베트남어 - HuggingFace Hub에서 커스텀 토크나이저 로드
             tokenizer = AutoTokenizer.from_pretrained(config.VIETNAMESE_TOKENIZER)
+            st.success("✅ 베트남어 토크나이저 로드 완료")
             return tokenizer
             
         else:
