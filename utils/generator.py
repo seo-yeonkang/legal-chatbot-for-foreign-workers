@@ -14,6 +14,11 @@ import faiss
 import pickle
 import json
 
+bos_id = None
+
+if model.config.model_type in ("t5", "mt5"):       # viT5, mT5 등
+    bos_id = tokenizer.convert_tokens_to_ids("<pad>")
+
 # SentenceTransformer는 필요할 때만 import (circular import 방지)
 def get_sentence_transformer():
     """SentenceTransformer 지연 import"""
@@ -141,18 +146,21 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
         
         # 답변 생성
         with torch.no_grad():
+
             outputs = model.generate(
                 **inputs,
-                max_length=max_length,
-                temperature=temperature,
-                top_p=config.TOP_P,
-                do_sample=True if temperature > 0 else False,
-                num_beams=3 if temperature == 0 else 1,
-                early_stopping=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
+                max_length = max_length or config.MAX_GENERATION_LENGTH,
+                temperature = temperature or config.TEMPERATURE,
+                top_p = config.TOP_P,
+                do_sample = (temperature or 0) > 0,
+                num_beams = 1,
+                decoder_start_token_id = bos_id,               # ← None 이면 무시되고 config 값 사용
+                repetition_penalty = 1.2,
+                no_repeat_ngram_size = 3,
+                pad_token_id = tokenizer.pad_token_id,
+                eos_token_id = tokenizer.eos_token_id,
             )
-        
+                    
         # 디코딩
         generated_text = tokenizer.decode(
             outputs[0], 
