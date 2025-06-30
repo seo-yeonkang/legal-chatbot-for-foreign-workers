@@ -6,25 +6,75 @@ from transformers import AutoModelForSeq2SeqLM
 import torch
 import streamlit as st
 import config
+import gdown
+import zipfile
+import os
+from pathlib import Path
+
+def download_chinese_model_from_gdrive():
+    """구글 드라이브에서 중국어 모델 다운로드"""
+    try:
+        # 이미 모델이 있는지 확인
+        if config.CHINESE_MODEL_LOCAL_PATH.exists():
+            st.info("🔄 중국어 모델이 이미 로컬에 있습니다.")
+            return str(config.CHINESE_MODEL_LOCAL_PATH)
+        
+        # 모델 디렉토리 생성
+        config.MODELS_DIR.mkdir(exist_ok=True)
+        
+        # 구글 드라이브에서 폴더 다운로드
+        st.info("📥 구글 드라이브에서 중국어 모델 폴더를 다운로드하고 있습니다...")
+        
+        # 방법 1: 폴더를 ZIP으로 압축했다면
+        # url = f"https://drive.google.com/uc?id={config.CHINESE_MODEL_GDRIVE_ID}"
+        # gdown.download(url, str(config.CHINESE_MODEL_ZIP_PATH), quiet=False)
+        
+        # 방법 2: 폴더 직접 다운로드 (권장)
+        folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
+        gdown.download_folder(folder_url, output=str(config.MODELS_DIR), quiet=False)
+        
+        # 다운로드된 폴더명을 chinese_model로 변경 (필요시)
+        downloaded_folder = config.MODELS_DIR / "chinese_model"
+        if not downloaded_folder.exists():
+            # gdown이 다른 이름으로 폴더를 만들었을 수 있음
+            for folder in config.MODELS_DIR.iterdir():
+                if folder.is_dir() and folder.name != "chinese_model":
+                    folder.rename(downloaded_folder)
+                    break
+        
+        st.success("✅ 중국어 모델 다운로드 완료!")
+        return str(config.CHINESE_MODEL_LOCAL_PATH)
+        
+    except Exception as e:
+        st.error(f"❌ 모델 다운로드 실패: {str(e)}")
+        st.info("💡 수동 다운로드 방법: 구글 드라이브에서 폴더를 다운로드하고 models/chinese_model 경로에 압축 해제하세요.")
+        return None
 
 @st.cache_resource
 def load_generation_models():
-    """생성 모델들 로드"""
+    """생성 모델들 로드 (구글 드라이브 + 외부 모델)"""
     try:
-        # 중국어 모델
+        # 중국어 모델 - 구글 드라이브에서 다운로드
+        chinese_model_path = download_chinese_model_from_gdrive()
+        if chinese_model_path is None:
+            st.error("중국어 모델 로드 실패")
+            return None, None
+            
         chinese_model = AutoModelForSeq2SeqLM.from_pretrained(
-            config.CHINESE_MODEL,
+            chinese_model_path,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else None
+            device_map="auto" if torch.cuda.is_available() else None,
+            local_files_only=True  # 로컬 파일만 사용
         )
         
-        # 베트남어 모델  
+        # 베트남어 모델 - 외부 모델 (HuggingFace Hub)
         vietnamese_model = AutoModelForSeq2SeqLM.from_pretrained(
             config.VIETNAMESE_MODEL,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto" if torch.cuda.is_available() else None
         )
         
+        st.success("✅ 모든 생성 모델 로드 완료!")
         return chinese_model, vietnamese_model
         
     except Exception as e:
