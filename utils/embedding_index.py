@@ -3,6 +3,7 @@
 # =============================================================================
 
 from sentence_transformers import SentenceTransformer
+from transformers import MBartForConditionalGeneration, AutoModelForSeq2SeqLM
 import faiss
 import json
 import pickle
@@ -15,12 +16,12 @@ def load_prebuilt_models():
     """사전 구축된 모델들을 즉시 로드"""
     try:
         # 중국어 모델 로드 (로컬에서)
-        chinese_model = AutoModelForSeq2SeqLM.from_pretrained(
-            str(config.CHINESE_MODEL_LOCAL_PATH),
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else None,
-            local_files_only=True
-        )
+        chinese_model = MBartForConditionalGeneration.from_pretrained(
+             str(config.CHINESE_MODEL_LOCAL_PATH),
+             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+             device_map="auto" if torch.cuda.is_available() else None,
+             local_files_only=True
+         )
         
         # 베트남어 모델 로드 (캐시에서)
         vietnamese_model = AutoModelForSeq2SeqLM.from_pretrained(
