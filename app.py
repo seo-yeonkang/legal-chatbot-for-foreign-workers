@@ -290,28 +290,38 @@ def main():
     
     # 질문 입력
     st.markdown("### 💬 질문을 입력하세요")
-    question = st.text_input(
-        "",
-        placeholder="중국어 또는 베트남어로 법률 관련 질문을 입력하세요...",
-        key="question_input"
-    )
-    
-    # 예시 질문들
+    def set_example(text):
+        st.session_state.question_input = text      # <- 콜백 내부에서 안전
+
     st.markdown("#### 📝 예시 질문")
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.markdown("**🇨🇳 中文示例**")
-        if st.button("我可以在韩国工作多长时间？", key="zh_example"):
-            st.session_state.question_input = "我可以在韩国工作多长时间？"
-            st.rerun()
+        st.button(
+            "我可以在韩国工作多长时间？",
+            key="zh_example",
+            on_click=set_example,
+            args=("我可以在韩国工作多长时间？",)
+        )
     
     with col2:
         st.markdown("**🇻🇳 Tiếng Việt**")
-        if st.button("Tôi có thể làm việc ở Hàn Quốc trong bao lâu?", key="vi_example"):
-            st.session_state.question_input = "Tôi có thể làm việc ở Hàn Quốc trong bao lâu?"
-            st.rerun()
+        st.button(
+            "Tôi có thể làm việc ở Hàn Quốc trong bao lâu?",
+            key="vi_example",
+            on_click=set_example,
+            args=("Tôi có thể làm việc ở Hàn Quốc trong bao lâu?",)
+        )
     
+    # ▶︎ 이제 텍스트 입력 위젯을 **버튼 아래** 또는 위젯 생성 뒤 값 읽기만
+    question = st.text_input(
+        "질문",
+        key="question_input",
+        label_visibility="collapsed",
+        placeholder="중국어 또는 베트남어로 법률 관련 질문을 입력하세요..."
+    )
+        
     # 질문 처리
     if question and question.strip():
         process_question(question.strip())
