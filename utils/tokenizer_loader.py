@@ -19,14 +19,24 @@ def load_tokenizer(language: str):
     """
     try:
         if language == "zh":
-            tokenizer = AutoTokenizer.from_pretrained(config.CHINESE_TOKENIZER)
+            # 중국어 - 로컬 다운로드된 모델에서 토크나이저 로드
+            if not config.CHINESE_MODEL_LOCAL_PATH.exists():
+                st.error("중국어 모델이 다운로드되지 않았습니다.")
+                return None
+                
+            tokenizer = AutoTokenizer.from_pretrained(
+                str(config.CHINESE_MODEL_LOCAL_PATH),
+                local_files_only=True
+            )
+            
             # mBART의 경우 언어 토큰 설정
-            if "mbart" in config.CHINESE_TOKENIZER.lower():
+            if hasattr(tokenizer, 'src_lang'):
                 tokenizer.src_lang = "zh_CN"
                 tokenizer.tgt_lang = "zh_CN"
             return tokenizer
             
         elif language == "vi":
+            # 베트남어 - HuggingFace Hub에서 커스텀 토크나이저 로드
             tokenizer = AutoTokenizer.from_pretrained(config.VIETNAMESE_TOKENIZER)
             return tokenizer
             
