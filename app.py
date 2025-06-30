@@ -326,11 +326,38 @@ def main():
     if question and question.strip():
         process_question(question.strip())
 
+from langdetect import detect, DetectorFactory
+import regex as re
+DetectorFactory.seed = 0      # 이미 있음
+
+
+def safe_detect(text: str) -> str:
+    """짧은·혼합 문장에 대한 보정 포함 중국어/베트남어 감지"""
+    try:
+        lang = detect(text)
+    except:
+        lang = "unknown"
+
+    # --- 보정 ① : 중국어 글자 존재하면 강제 zh ---
+    if re.search(r"\p{Han}", text):
+        return "zh"
+
+    # --- 보정 ② : 베트남어 특수 문자 존재하면 강제 vi ---
+    if re.search(r"[ăâđêôơưĂÂĐÊÔƠƯ]", text):
+        return "vi"
+
+    return lang
+
+
 def process_question(question: str):
     """질문 처리 및 답변 생성"""
+    if 'vn_index' not in st.session_state or 'cn_index' not in st.session_state:
+        st.warning("🔄 시스템이 아직 완전히 초기화되지 않았습니다. 잠시만 기다려 주세요.")
+    return
+    
     try:
         # 언어 감지
-        detected_lang = detect(question)
+        detected_lang = safe_detect(question)
         
         # 지원되는 언어 확인
         if detected_lang not in ['zh', 'vi']:
