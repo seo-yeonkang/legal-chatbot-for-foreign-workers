@@ -2,7 +2,7 @@
 # utils/generator.py - 답변 생성
 # =============================================================================
 
-from transformers import AutoModelForSeq2SeqLM, SentenceTransformer
+from transformers import AutoModelForSeq2SeqLM
 import torch
 import streamlit as st
 import config
@@ -13,6 +13,12 @@ from pathlib import Path
 import faiss
 import pickle
 import json
+
+# SentenceTransformer는 필요할 때만 import (circular import 방지)
+def get_sentence_transformer():
+    """SentenceTransformer 지연 import"""
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer
 
 def download_chinese_model_from_gdrive():
     """구글 드라이브에서 중국어 모델 다운로드"""
