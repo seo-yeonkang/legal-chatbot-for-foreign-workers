@@ -8,6 +8,7 @@ from langdetect import detect, DetectorFactory
 from pathlib import Path
 import sys
 import traceback
+import torch
 
 # 현재 디렉토리를 Python 경로에 추가
 current_dir = Path(__file__).parent
@@ -92,49 +93,95 @@ with st.sidebar:
     st.markdown("### 🌐 지원 언어")
     st.markdown("- 🇨🇳 중국어 (Chinese)")
     st.markdown("- 🇻🇳 베트남어 (Vietnamese)")
+    
+    # 캐시 상태 표시
+    st.markdown("---")
+    st.markdown("### ⚡ 시스템 상태")
+    
+    if 'app_fully_initialized' in st.session_state:
+        st.success("✅ 캐시 활성화됨")
+        st.info("🚀 고속 모드")
+        
+        # 캐시 초기화 버튼 (문제 발생시 사용)
+        if st.button("🔄 캐시 초기화", help="문제 발생시에만 사용하세요"):
+            # 모든 캐시 클리어
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.cache_resource.clear()
+            st.rerun()
+    else:
+        st.warning("⏳ 초기화 중...")
+        
+    # 성능 팁
+    st.markdown("### 💡 성능 팁")
+    st.markdown("""
+    - **첫 실행**: 2-3분 소요 (모델 다운로드)
+    - **이후 실행**: 즉시 시작
+    - **문제시**: 캐시 초기화 버튼 사용
+    """)
+    
+    # 저장 공간 정보
+    if 'app_fully_initialized' in st.session_state:
+        st.markdown("### 📊 저장 공간")
+        model_path = config.CHINESE_MODEL_LOCAL_PATH
+        if model_path.exists():
+            try:
+                size_mb = sum(f.stat().st_size for f in model_path.rglob('*') if f.is_file()) / (1024*1024)
+                st.info(f"💾 모델 크기: {size_mb:.1f}MB")
+            except:
+                st.info("💾 모델이 저장됨")
 
 # 메인 콘텐츠
 def main():
-    # 시스템 초기화
-    if 'initialized' not in st.session_state:
-        with st.spinner("🔄 시스템을 초기화하고 있습니다..."):
-            try:
-                # 언어별 임베딩 시스템 로드
-                (embed_model, cn_index, cn_passages, cn_metadata, 
-                 vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
-                
-                if embed_model is None:
-                    st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 생성 모델 로드
-                chinese_model, vietnamese_model = load_generation_models()
-                
-                if chinese_model is None or vietnamese_model is None:
-                    st.error("❌ 생성 모델 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 세션 상태에 저장 (언어별 분리)
-                st.session_state.embed_model = embed_model
-                st.session_state.cn_index = cn_index
-                st.session_state.cn_passages = cn_passages
-                st.session_state.cn_metadata = cn_metadata
-                st.session_state.vn_index = vn_index
-                st.session_state.vn_passages = vn_passages
-                st.session_state.vn_metadata = vn_metadata
-                st.session_state.chinese_model = chinese_model
-                st.session_state.vietnamese_model = vietnamese_model
-                st.session_state.initialized = True
-                
-                # 로드된 데이터 확인
-                cn_count = len(cn_passages) if cn_passages else 0
-                vn_count = len(vn_passages) if vn_passages else 0
-                st.success(f"✅ 시스템 초기화 완료! (🇨🇳 {cn_count}개, 🇻🇳 {vn_count}개 문서)")
-                
-            except Exception as e:
-                st.error(f"❌ 초기화 실패: {str(e)}")
-                st.error(f"상세 오류: {traceback.format_exc()}")
+    # 시스템 초기화 (한 번만!)
+    if 'app_fully_initialized' not in st.session_state:
+        
+        # 초기화 과정을 한 번만 보여주기
+        with st.spinner("🚀 법률 챗봇 시스템을 초기화하고 있습니다..."):
+            
+            # 1단계: 임베딩 시스템 로드
+            st.info("📚 1/2 단계: 법률 데이터베이스 준비 중...")
+            (embed_model, cn_index, cn_passages, cn_metadata, 
+             vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
+            
+            if embed_model is None:
+                st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
                 st.stop()
+            
+            # 2단계: 생성 모델 로드
+            st.info("🤖 2/2 단계: AI 모델 준비 중...")
+            chinese_model, vietnamese_model = load_generation_models()
+            
+            if chinese_model is None or vietnamese_model is None:
+                st.error("❌ 생성 모델 로드에 실패했습니다.")
+                st.stop()
+            
+            # 완전 초기화 마크
+            st.session_state.app_fully_initialized = True
+            
+            # 로드된 데이터 확인
+            cn_count = len(cn_passages) if cn_passages else 0
+            vn_count = len(vn_passages) if vn_passages else 0
+            
+            # 성공 메시지
+            st.balloons()  # 축하 효과!
+            st.success(f"""
+            🎉 **법률 챗봇 준비 완료!**
+            - 🇨🇳 중국어 법률 문서: {cn_count}개
+            - 🇻🇳 베트남어 법률 문서: {vn_count}개
+            - 💡 다음부터는 즉시 시작됩니다!
+            """)
+    
+    else:
+        # 이미 초기화됨 - 즉시 시작
+        st.success("⚡ 법률 챗봇이 준비되었습니다! (캐시 사용)")
+        
+        # 간단한 상태 확인만
+        cn_count = len(st.session_state.cn_passages) if hasattr(st.session_state, 'cn_passages') and st.session_state.cn_passages else 0
+        vn_count = len(st.session_state.vn_passages) if hasattr(st.session_state, 'vn_passages') and st.session_state.vn_passages else 0
+        
+        if cn_count > 0 or vn_count > 0:
+            st.info(f"📊 사용 가능: 🇨🇳 {cn_count}개, 🇻🇳 {vn_count}개 법률 문서")
     
     # 질문 입력
     st.markdown("### 💬 질문을 입력하세요")
@@ -179,7 +226,7 @@ def process_question(question: str):
         lang_display = {"zh": "🇨🇳 중국어", "vi": "🇻🇳 베트남어"}
         st.info(f"감지된 언어: {lang_display.get(detected_lang, detected_lang)}")
         
-        # 언어에 따른 인덱스 및 패시지 선택
+        # 언어에 따른 인덱스 및 패시지 선택 (캐시에서 직접 가져오기)
         if detected_lang == "zh":
             faiss_index = st.session_state.cn_index
             passages = st.session_state.cn_passages
@@ -195,8 +242,8 @@ def process_question(question: str):
             st.error(f"❌ {lang_name} 법률 데이터가 로드되지 않았습니다.")
             return
         
-        # 관련 법률 조문 검색
-        with st.spinner("🔍 관련 법률 조문을 검색하고 있습니다..."):
+        # 관련 법률 조문 검색 (더 빠른 검색)
+        with st.spinner("🔍 관련 법률 조문 검색 중..."):
             retrieved_docs = search_similar_passages(
                 st.session_state.embed_model,
                 faiss_index,
@@ -228,12 +275,12 @@ def process_question(question: str):
         # 프롬프트 구성
         prompt = build_prompt(question, retrieved_docs, detected_lang)
         
-        # 모델 선택
+        # 모델 선택 (캐시에서 직접 가져오기)
         model = (st.session_state.chinese_model if detected_lang == "zh" 
                 else st.session_state.vietnamese_model)
         
-        # 답변 생성
-        with st.spinner("🤖 답변을 생성하고 있습니다..."):
+        # 답변 생성 (더 빠른 생성)
+        with st.spinner("🤖 AI 답변 생성 중..."):
             answer = generate_answer(prompt, model, tokenizer)
         
         # 답변 표시
@@ -246,10 +293,26 @@ def process_question(question: str):
         st.markdown("---")
         st.markdown("**⚠️ 면책조항:** 본 답변은 AI가 생성한 참고용 정보입니다. 정확한 법률 상담은 전문가와 상의하시기 바랍니다.")
         
+        # 성능 정보 (간단하게)
+        if 'app_fully_initialized' in st.session_state:
+            with st.expander("📊 시스템 성능 정보"):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("🚀 모드", "고속 캐시")
+                with col2:
+                    device = "GPU" if torch.cuda.is_available() else "CPU"
+                    st.metric("💻 처리 장치", device)
+                with col3:
+                    docs_count = len(retrieved_docs) if retrieved_docs else 0
+                    st.metric("📄 검색 문서", f"{docs_count}개")
+        
     except Exception as e:
         st.error(f"❌ 처리 중 오류가 발생했습니다: {str(e)}")
         with st.expander("상세 오류 정보"):
             st.text(traceback.format_exc())
+        
+        # 빠른 해결책 제안
+        st.info("💡 **빠른 해결책**: 사이드바의 '캐시 초기화' 버튼을 클릭해보세요.")
 
 if __name__ == "__main__":
     main()
