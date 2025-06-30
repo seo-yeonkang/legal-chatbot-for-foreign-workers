@@ -105,16 +105,8 @@ def load_embeddings_and_index():
 # is_deployment_ready 함수 추가 (generator.py에서 이동)
 def is_deployment_ready():
     """배포 준비가 완료되었는지 확인"""
-    marker_file = config.MODELS_DIR / ".deployment_ready"
-    if marker_file.exists():
-        try:
-            import json
-            with open(marker_file, 'r') as f:
-                data = json.load(f)
-                return data.get("deployment_complete", False)
-        except:
-            return False
-    return False
+    """models/.deployment_ready  파일이 존재하기만 하면 True"""
+    return (config.MODELS_DIR / ".deployment_ready").exists()
 
 def load_language_index(embedding_model, language, jsonl_path, faiss_path, passages_path):
     """특정 언어의 인덱스 로드"""
