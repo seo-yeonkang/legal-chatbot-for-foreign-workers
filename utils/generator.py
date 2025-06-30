@@ -20,51 +20,58 @@ def get_sentence_transformer():
     from sentence_transformers import SentenceTransformer
     return SentenceTransformer
 
+READY_MARKER = config.CHINESE_MODEL_LOCAL_PATH / ".ready"   # ✅ 1회 완료표시
 
 def download_chinese_model_from_gdrive():
-    """Google Drive 폴더 ID → 전체 다운로드 → 정리 후 경로 반환"""
+    """
+    • models/chinese_model/ 가 없으면 Drive 폴더(ID)에서 다운로드
+    • 완료 후 '.ready' 파일 생성 → 다음 실행부터 다운로드 스킵
+    """
+    # ① 이미 준비됐으면 즉시 반환
+    if READY_MARKER.exists():
+        return str(config.CHINESE_MODEL_LOCAL_PATH)
+
     try:
-        # ① 이미 설치돼 있으면 즉시 반환
-        if config.CHINESE_MODEL_LOCAL_PATH.exists():
-            return str(config.CHINESE_MODEL_LOCAL_PATH)
+        st.info("📥 중국어 모델이 없어서 Google Drive에서 다운로드합니다…")
 
-        # ② models/ 디렉터리 준비
-        config.MODELS_DIR.mkdir(exist_ok=True)
+        # models/ 디렉터리
+        config.MODELS_DIR.mkdir(exist_ok=True, parents=True)
 
-        # ③ gdown으로 폴더 전체 다운로드
+        # ② Drive 폴더 전체 다운로드 → models/ 하위에
         folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
-        st.info("📥 중국어 모델 폴더 다운로드 중… (잠시 소요)")
-
         gdown.download_folder(
             folder_url,
-            output=str(config.MODELS_DIR),     # models/ 아래로
+            output=str(config.MODELS_DIR),
             quiet=False,
-            use_cookies=False                  # 권한 O(Anyone with link) 이면 강제 쿠키 불필요
+            use_cookies=False
         )
 
-        # ④ 다운로드된 최상위 폴더를 chinese_model 로 맞추기
+        # ③ 폴더명 정규화 → chinese_model
         if not config.CHINESE_MODEL_LOCAL_PATH.exists():
             for p in config.MODELS_DIR.iterdir():
                 if p.is_dir() and p.name != "chinese_model":
                     p.rename(config.CHINESE_MODEL_LOCAL_PATH)
                     break
 
-        # ⑤ 서브폴더에 있을 수 있는 가중치 파일을 최상단으로 이동
+        # ④ 서브폴더에 숨어있는 가중치(.bin/.safetensors) 끌어올리기
         for root, _, files in os.walk(config.CHINESE_MODEL_LOCAL_PATH):
-            for fname in files:
-                if fname.endswith((".bin", ".safetensors")):
-                    src = Path(root) / fname
-                    dst = config.CHINESE_MODEL_LOCAL_PATH / fname
+            for fn in files:
+                if fn.endswith((".bin", ".safetensors")):
+                    src = Path(root) / fn
+                    dst = config.CHINESE_MODEL_LOCAL_PATH / fn
                     if not dst.exists():
                         src.replace(dst)
 
-        st.success("✅ 중국어 모델 다운로드·정리 완료!")
+        # ⑤ 마커 생성 → 이후 재다운로드 없음
+        READY_MARKER.touch()
+        st.success("✅ 중국어 모델 준비 완료 (캐시됨)!")
         return str(config.CHINESE_MODEL_LOCAL_PATH)
 
     except Exception as e:
-        st.error(f"❌ 중국어 모델 다운로드/설치 실패: {e}")
+        st.error(f"❌ 모델 다운로드/설치 실패: {e}")
         return None
         
+
 @st.cache_resource
 def load_generation_models():
     """생성 모델들 로드 (구글 드라이브 + 외부 모델)"""
