@@ -1,10 +1,11 @@
 # utils/common.py (새 파일 추천)
 import json, config, time
 from pathlib import Path
+from config import MARKER_FILE
 
 def mark_deployment_ready():
     """모든 모델·인덱스가 준비된 뒤 호출 → .deployment_ready 기록"""
-    marker = config.BASE_DIR / ".deployment_ready"
+    MARKER_FILE.write_text('{"deployment_complete": true}')
     data = {
         "deployment_complete": True,
         "timestamp": time.time(),
