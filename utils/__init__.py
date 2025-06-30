@@ -7,14 +7,16 @@
 """
 
 from .tokenizer_loader import load_tokenizer
-from .embedding_index import load_embeddings_and_index, save_embeddings_and_index
+from .embedding_index import load_embeddings_and_index, save_language_index
 from .rag_prompt import build_prompt
-from .generator import generate_answer
+from .generator import generate_answer, load_generation_models, download_chinese_model_from_gdrive
 
 __all__ = [
     "load_tokenizer",
     "load_embeddings_and_index", 
-    "save_embeddings_and_index",
+    "save_language_index",
     "build_prompt",
-    "generate_answer"
+    "generate_answer",
+    "load_generation_models",
+    "download_chinese_model_from_gdrive"
 ]
