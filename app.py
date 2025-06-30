@@ -99,110 +99,40 @@ with st.sidebar:
     st.markdown("- 🇻🇳 베트남어 (Vietnamese)")
     
 
+@st.cache_resource(show_spinner=False)
+def get_shared_resources():
+    """한 번만 로드해서 모든 세션이 공유"""
+    embed_model, cn_idx, cn_pass, cn_meta, vn_idx, vn_pass, vn_meta = load_embeddings_and_index()
+    chinese_model, vietnamese_model = load_generation_models()
+    return {
+        "embed_model": embed_model,
+        "cn_index": cn_idx,  "cn_passages": cn_pass,  "cn_meta": cn_meta,
+        "vn_index": vn_idx,  "vn_passages": vn_pass,  "vn_meta": vn_meta,
+        "ch_model":  chinese_model,
+        "vn_model":  vietnamese_model,
+    }
+
+def init_session():
+    if "initialized" in st.session_state:
+        return
+    data = get_shared_resources()
+
+    st.session_state.embed_model       = data["embed_model"]
+    st.session_state.cn_index          = data["cn_index"]
+    st.session_state.cn_passages       = data["cn_passages"]
+    st.session_state.cn_metadata       = data["cn_meta"]
+    st.session_state.vn_index          = data["vn_index"]
+    st.session_state.vn_passages       = data["vn_passages"]
+    st.session_state.vn_metadata       = data["vn_meta"]
+    st.session_state.chinese_model     = data["ch_model"]
+    st.session_state.vietnamese_model  = data["vn_model"]
+
+    st.session_state.initialized = True
+
 # 메인 콘텐츠
 def main():
-    # 시스템 초기화 (배포 모드 vs 개발 모드)
-    if 'app_fully_initialized' not in st.session_state:
-        
-        # 배포 완료 상태 확인
-        if is_deployment_ready():
-            # 🚀 프로덕션 모드: 즉시 로드
-            with st.spinner("⚡ 프로덕션 모드: 시스템 즉시 로드 중..."):
-                
-                # 임베딩 시스템 즉시 로드
-                (embed_model, cn_index, cn_passages, cn_metadata, 
-                 vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
-                
-                if embed_model is None:
-                    st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 생성 모델 즉시 로드
-                chinese_model, vietnamese_model = load_generation_models()
-                
-                if chinese_model is None or vietnamese_model is None:
-                    st.error("❌ 생성 모델 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 로드된 데이터 확인
-                cn_count = len(cn_passages) if cn_passages else 0
-                vn_count = len(vn_passages) if vn_passages else 0
-                
-                # 성공 메시지 (프로덕션 모드)
-                st.success(f"""
-                🚀 **프로덕션 모드: 즉시 시작!**
-                - ⚡ 사전 구축된 모델 로드 완료
-                - 🇨🇳 중국어 법률 문서: {cn_count}개
-                - 🇻🇳 베트남어 법률 문서: {vn_count}개
-                """)
-
-                st.session_state.embeddings_ready  = True
-                st.session_state.generation_ready  = True
-                st.session_state.chinese_model     = chinese_model
-                st.session_state.vietnamese_model  = vietnamese_model
-                st.session_state.embed_model   = embed_model
-                st.session_state.cn_index      = cn_index
-                st.session_state.cn_passages   = cn_passages
-                st.session_state.cn_metadata   = cn_metadata
-                st.session_state.vn_index      = vn_index
-                st.session_state.vn_passages   = vn_passages
-                st.session_state.vn_metadata   = vn_metadata
-                            
-                from utils.common import mark_deployment_ready
-                mark_deployment_ready() 
-    
-        else:
-            # 🔨 개발 모드: 기존 방식 (단계별 로드)
-            with st.spinner("🔨 개발 모드: 시스템을 단계별로 초기화합니다..."):
-                
-                # 1단계: 임베딩 시스템 로드
-                st.info("📚 1/2 단계: 법률 데이터베이스 준비 중...")
-                (embed_model, cn_index, cn_passages, cn_metadata, 
-                 vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
-                
-                if embed_model is None:
-                    st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 2단계: 생성 모델 로드
-                st.info("🤖 2/2 단계: AI 모델 준비 중...")
-                chinese_model, vietnamese_model = load_generation_models()
-                
-                if chinese_model is None or vietnamese_model is None:
-                    st.error("❌ 생성 모델 로드에 실패했습니다.")
-                    st.stop()
-                
-                # 로드된 데이터 확인
-                cn_count = len(cn_passages) if cn_passages else 0
-                vn_count = len(vn_passages) if vn_passages else 0
-                
-                # 성공 메시지 (개발 모드)
-                st.balloons()  # 축하 효과!
-                st.success(f"""
-                🎉 **개발 모드: 초기화 완료!**
-                - 🇨🇳 중국어 법률 문서: {cn_count}개
-                - 🇻🇳 베트남어 법률 문서: {vn_count}개
-                - 💡 프로덕션 배포시엔 즉시 시작됩니다!
-                """)
-        
-        # 완전 초기화 마크
-        st.session_state.app_fully_initialized = True
-    
-    else:
-        # 이미 초기화됨 - 상태 표시만
-        if is_deployment_ready():
-            st.success("🚀 프로덕션 모드: 법률 챗봇 준비 완료!")
-        else:
-            st.success("⚡ 개발 모드: 법률 챗봇 준비 완료! (캐시 사용)")
-        
-        # 간단한 상태 확인
-        cn_count = len(st.session_state.cn_passages) if hasattr(st.session_state, 'cn_passages') and st.session_state.cn_passages else 0
-        vn_count = len(st.session_state.vn_passages) if hasattr(st.session_state, 'vn_passages') and st.session_state.vn_passages else 0
-        
-        if cn_count > 0 or vn_count > 0:
-            st.info(f"📊 사용 가능: 🇨🇳 {cn_count}개, 🇻🇳 {vn_count}개 법률 문서")
-  
-    
+    init_session()
+    st.success("🚀 시스템 준비 완료!")
     
     # 질문 입력
     st.markdown("### 💬 질문을 입력하세요")
@@ -267,8 +197,8 @@ def safe_detect(text: str) -> str:
 
 def process_question(question: str):
     """질문 처리 및 답변 생성"""
-    if 'vn_index' not in st.session_state or 'cn_index' not in st.session_state:
-        st.warning("🔄 시스템이 아직 완전히 초기화되지 않았습니다. 잠시만 기다려 주세요.")
+    if "initialized" not in st.session_state:
+        st.warning("🔄 시스템이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.")
         return
         
     if ('chinese_model' not in st.session_state or
