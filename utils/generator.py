@@ -69,12 +69,12 @@ def load_generation_models():
             st.error("중국어 모델 로드 실패")
             return None, None
             
-        chinese_model = AutoModelForSeq2SeqLM.from_pretrained(
-            chinese_model_path,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else None,
-            local_files_only=True  # 로컬 파일만 사용
-        )
+        chinese_model = MBartForConditionalGeneration.from_pretrained(
+             chinese_model_path,
+             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+             device_map="auto" if torch.cuda.is_available() else None,
+             local_files_only=True
+         )
         
         # 베트남어 모델 - 외부 모델 (HuggingFace Hub)
         vietnamese_model = AutoModelForSeq2SeqLM.from_pretrained(
