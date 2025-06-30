@@ -14,59 +14,68 @@ import config
 @st.cache_resource(show_spinner=False)
 def load_embeddings_and_index():
     """
-    언어별 임베딩 모델과 FAISS 인덱스 로드 (강화된 캐싱)
+    언어별 임베딩 모델과 FAISS 인덱스 로드 (배포 모드 vs 개발 모드)
     
     Returns:
         tuple: (embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata)
     """
     
-    # session_state 이중 캐싱 확인
-    if 'embedding_system_loaded' in st.session_state and st.session_state.embedding_system_loaded:
-        st.info("⚡ 캐시된 임베딩 시스템을 사용합니다.")
-        return (st.session_state.embed_model, st.session_state.cn_index, st.session_state.cn_passages, 
-                st.session_state.cn_metadata, st.session_state.vn_index, st.session_state.vn_passages, 
-                st.session_state.vn_metadata)
-    
-    try:
-        # 임베딩 모델 로드 (공통)
-        with st.spinner("🔄 임베딩 모델 로드 중..."):
-            embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
+    # 배포 완료 상태 확인
+    if is_deployment_ready():
+        # 🚀 배포 모드: 사전 구축된 인덱스 즉시 로드
+        st.success("⚡ 프로덕션 모드: 사전 구축된 인덱스 즉시 로드")
+        return load_prebuilt_indexes()
+    else:
+        # 🔨 개발 모드: 기존 방식 (인덱스 생성 포함)
+        st.info("🔨 개발 모드: 인덱스 생성 및 구축")
         
-        # 중국어 인덱스 로드
-        with st.spinner("🔄 중국어 법률 데이터 준비 중..."):
-            cn_index, cn_passages, cn_metadata = load_language_index(
-                embedding_model, 
-                'zh',
-                config.CN_LAW_DATA_PATH,
-                config.CN_FAISS_INDEX_PATH,
-                config.CN_PASSAGES_PATH
-            )
+        # session_state 캐싱 확인
+        if 'embedding_system_loaded' in st.session_state and st.session_state.embedding_system_loaded:
+            st.info("⚡ 캐시된 임베딩 시스템을 사용합니다.")
+            return (st.session_state.embed_model, st.session_state.cn_index, st.session_state.cn_passages, 
+                    st.session_state.cn_metadata, st.session_state.vn_index, st.session_state.vn_passages, 
+                    st.session_state.vn_metadata)
         
-        # 베트남어 인덱스 로드
-        with st.spinner("🔄 베트남어 법률 데이터 준비 중..."):
-            vn_index, vn_passages, vn_metadata = load_language_index(
-                embedding_model,
-                'vi', 
-                config.VN_LAW_DATA_PATH,
-                config.VN_FAISS_INDEX_PATH,
-                config.VN_PASSAGES_PATH
-            )
-        
-        # session_state에 저장 (이중 캐싱)
-        st.session_state.embed_model = embedding_model
-        st.session_state.cn_index = cn_index
-        st.session_state.cn_passages = cn_passages
-        st.session_state.cn_metadata = cn_metadata
-        st.session_state.vn_index = vn_index
-        st.session_state.vn_passages = vn_passages
-        st.session_state.vn_metadata = vn_metadata
-        st.session_state.embedding_system_loaded = True
-        
-        return embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata
-        
-    except Exception as e:
-        st.error(f"임베딩 시스템 로드 실패: {str(e)}")
-        return None, None, None, None, None, None, None
+        try:
+            # 임베딩 모델 로드 (공통)
+            with st.spinner("🔄 임베딩 모델 로드 중..."):
+                embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
+            
+            # 중국어 인덱스 로드
+            with st.spinner("🔄 중국어 법률 데이터 준비 중..."):
+                cn_index, cn_passages, cn_metadata = load_language_index(
+                    embedding_model, 
+                    'zh',
+                    config.CN_LAW_DATA_PATH,
+                    config.CN_FAISS_INDEX_PATH,
+                    config.CN_PASSAGES_PATH
+                )
+            
+            # 베트남어 인덱스 로드
+            with st.spinner("🔄 베트남어 법률 데이터 준비 중..."):
+                vn_index, vn_passages, vn_metadata = load_language_index(
+                    embedding_model,
+                    'vi', 
+                    config.VN_LAW_DATA_PATH,
+                    config.VN_FAISS_INDEX_PATH,
+                    config.VN_PASSAGES_PATH
+                )
+            
+            # session_state에 저장 (이중 캐싱)
+            st.session_state.embed_model = embedding_model
+            st.session_state.cn_index = cn_index
+            st.session_state.cn_passages = cn_passages
+            st.session_state.cn_metadata = cn_metadata
+            st.session_state.vn_index = vn_index
+            st.session_state.vn_passages = vn_passages
+            st.session_state.vn_metadata = vn_metadata
+            st.session_state.embedding_system_loaded = True
+            
+            return embedding_model, cn_index, cn_passages, cn_metadata, vn_index, vn_passages, vn_metadata
+            
+        except Exception as e:
+            st.error(f"임베딩 시스템 로드 실패: {str(e)}")
+            return None, None, None, None, None, None, None
 
 def load_language_index(embedding_model, language, jsonl_path, faiss_path, passages_path):
     """특정 언어의 인덱스 로드"""
