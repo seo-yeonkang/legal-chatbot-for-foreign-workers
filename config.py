@@ -37,7 +37,7 @@ CHINESE_MODEL_FALLBACK = "Helsinki-NLP/opus-mt-en-zh"  # 경량 대체 모델
 
 # 베트남어 모델 (경량화)
 VIETNAMESE_MODEL = "google/mt5-small"  # 작은 모델 사용
-VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese-tokenizer" 
+VIETNAMESE_TOKENIZER = MODELS_DIR / "vietnamese_tokenizer" 
 
 # Streamlit Cloud 메모리 제한 감지
 STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SHARING_MODE') is not None or \
