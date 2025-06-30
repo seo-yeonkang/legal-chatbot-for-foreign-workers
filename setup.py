@@ -8,8 +8,8 @@ from pathlib import Path
 import gdown
 import zipfile
 import json
-from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from sentence_transformers import SentenceTransformer
 import faiss
 import pickle
 import argparse
