@@ -12,6 +12,8 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
 
+MARKER_FILE = MODELS_DIR / ".deployment_ready"
+
 # 데이터 경로 (언어별 분리)
 CN_LAW_DATA_PATH = DATA_DIR / "cn_law_chunks.jsonl"
 VN_LAW_DATA_PATH = DATA_DIR / "vn_law_chunks.jsonl"
