@@ -25,7 +25,7 @@ EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # 중국어 모델 (파인튜닝된 모델로 교체)
 CHINESE_MODEL = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/chinese_model"  # 실제 파인튜닝 모델로 교체
-CHINESE_TOKENIZER = "facebook/mbart-large-50-many-to-many-mmt"
+CHINESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/chinese_model"
 
 # 베트남어 모델
 VIETNAMESE_MODEL = "google/mt5-small"
