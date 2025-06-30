@@ -38,8 +38,8 @@ CHINESE_MODEL_ZIP_PATH = MODELS_DIR / "chinese_model.zip"
 CHINESE_MODEL_FALLBACK = "Helsinki-NLP/opus-mt-en-zh"  # 경량 대체 모델
 
 # 베트남어 모델 (경량화)
-VIETNAMESE_MODEL     = "vinai/vit5-base"
-VIETNAMESE_TOKENIZER = "vinai/vit5-base"
+VIETNAMESE_MODEL     = "VietAI/vit5-base"
+VIETNAMESE_TOKENIZER = "VietAI/vit5-base"
 
 # Streamlit Cloud 메모리 제한 감지
 STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SHARING_MODE') is not None or \
