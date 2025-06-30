@@ -20,16 +20,21 @@ CN_PASSAGES_PATH = DATA_DIR / "cn_passages.pkl"
 VN_FAISS_INDEX_PATH = DATA_DIR / "vn_faiss_index.pkl"
 VN_PASSAGES_PATH = DATA_DIR / "vn_passages.pkl"
 
-# 모델 설정 (Hugging Face Hub 사용)
+# 모델 설정
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# 중국어 모델 (파인튜닝된 모델로 교체)
-CHINESE_MODEL = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/chinese_model"  # 실제 파인튜닝 모델로 교체
-CHINESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/chinese_model"
+# 중국어 모델 (구글 드라이브에서 다운로드)
+# 방법 1: 폴더를 ZIP으로 압축한 경우
+CHINESE_MODEL_GDRIVE_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
+CHINESE_MODEL_LOCAL_PATH = MODELS_DIR / "chinese_model"
+CHINESE_MODEL_ZIP_PATH = MODELS_DIR / "chinese_model.zip"
 
-# 베트남어 모델
+# 방법 2: 폴더 직접 다운로드 (gdown으로 폴더 다운로드)
+CHINESE_MODEL_FOLDER_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
+
+# 베트남어 모델 (외부 모델 + 커스텀 토크나이저)
 VIETNAMESE_MODEL = "google/mt5-small"
-VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese_tokenizer"  # 실제 커스텀 토크나이저로 교체
+VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese-tokenizer"  # HF Hub의 커스텀 토크나이저
 
 # 생성 설정
 MAX_RETRIEVED_DOCS = 3
