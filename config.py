@@ -23,27 +23,34 @@ VN_PASSAGES_PATH = DATA_DIR / "vn_passages.pkl"
 # 모델 설정
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# 중국어 모델 (구글 드라이브에서 다운로드)
-# 방법 1: 폴더를 ZIP으로 압축한 경우
+# 중국어 모델 (Streamlit Cloud 최적화)
+# 메모리 제한으로 인해 더 작은 모델 사용 권장
 CHINESE_MODEL_GDRIVE_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
 CHINESE_MODEL_LOCAL_PATH = MODELS_DIR / "chinese_model"
 CHINESE_MODEL_ZIP_PATH = MODELS_DIR / "chinese_model.zip"
 
-# 방법 2: 폴더 직접 다운로드 (gdown으로 폴더 다운로드)
-CHINESE_MODEL_FOLDER_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
+# Streamlit Cloud 메모리 제한 고려 (1GB)
+# 대용량 모델 대신 경량 모델 사용 옵션
+CHINESE_MODEL_FALLBACK = "Helsinki-NLP/opus-mt-en-zh"  # 경량 대체 모델
 
-# 베트남어 모델 (외부 모델 + 커스텀 토크나이저)
-VIETNAMESE_MODEL = "google/mt5-small"
+# 베트남어 모델 (경량화)
+VIETNAMESE_MODEL = "google/mt5-small"  # 작은 모델 사용
 VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese-tokenizer" 
 
-# 생성 설정
-MAX_RETRIEVED_DOCS = 3
-MAX_INPUT_LENGTH = 512
-MAX_GENERATION_LENGTH = 512
+# Streamlit Cloud 메모리 제한 감지
+STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SHARING_MODE') is not None or \
+                  'streamlit.io' in os.environ.get('HOSTNAME', '') or \
+                  '/mount/src/' in str(Path.cwd())
+
+# 생성 설정 (Streamlit Cloud 최적화)
+MAX_RETRIEVED_DOCS = 2 if STREAMLIT_CLOUD else 3  # 메모리 절약
+MAX_INPUT_LENGTH = 256 if STREAMLIT_CLOUD else 512  # 메모리 절약
+MAX_GENERATION_LENGTH = 256 if STREAMLIT_CLOUD else 512  # 메모리 절약
 TEMPERATURE = 0.7
 TOP_P = 0.9
 
 # Streamlit 설정
 PAGE_TITLE = "외국인 근로자 법률 챗봇"
 PAGE_ICON = "⚖️"
+
 
