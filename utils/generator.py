@@ -41,7 +41,7 @@ def download_chinese_model_from_gdrive():
         folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
         gdown.download_folder(
             folder_url,
-            output=str(config.MODELS_DIR),
+            output=str(config.CHINESE_MODEL_LOCAL_PATH),  # ✅ 바로 chinese_model 폴더
             quiet=False,
             use_cookies=False
         )
