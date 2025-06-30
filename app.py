@@ -334,7 +334,7 @@ def main():
     )
         
     # 질문 처리
-    if question and question.strip():
+    if st.button("질문하기") and question.strip():
         process_question(question.strip())
 
 from langdetect import detect, DetectorFactory
