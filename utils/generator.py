@@ -2,7 +2,7 @@
 # utils/generator.py - 답변 생성
 # =============================================================================
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import MBartForConditionalGeneration, AutoModelForSeq2SeqLM
 import torch
 import streamlit as st
 import config
