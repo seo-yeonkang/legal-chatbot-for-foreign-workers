@@ -117,6 +117,8 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
     Returns:
         str: 생성된 답변
     """
+    inputs.pop("token_type_ids", None)
+    
     if max_length is None:
         max_length = config.MAX_GENERATION_LENGTH
     if temperature is None:
@@ -180,6 +182,9 @@ def generate_streaming_answer(prompt: str, model, tokenizer, max_length: int = N
     Yields:
         str: 생성되는 토큰들
     """
+
+    inputs.pop("token_type_ids", None)
+    
     if max_length is None:
         max_length = config.MAX_GENERATION_LENGTH
     
