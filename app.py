@@ -23,8 +23,10 @@ from utils import (
     load_tokenizer,
     load_embeddings_and_index,
     build_prompt,
-    generate_answer
+    generate_answer,
+    common
 )
+from utils.common import mark_deployment_ready
 from utils.embedding_index import search_similar_passages, is_deployment_ready
 from utils.generator import load_generation_models
 import pickle
@@ -158,6 +160,7 @@ with st.sidebar:
             st.markdown("**프로덕션 모드로 전환하려면:**")
             st.code("python setup_models.py", language="bash")
             st.markdown("실행 후 앱을 재시작하세요.")
+
     
     # 성능 정보
     st.markdown("### 📊 성능 정보")
@@ -236,7 +239,13 @@ def main():
                 - 🇨🇳 중국어 법률 문서: {cn_count}개
                 - 🇻🇳 베트남어 법률 문서: {vn_count}개
                 """)
-        
+
+                st.session_state.embeddings_ready  = True
+                st.session_state.generation_ready  = True
+            
+                from utils.common import mark_deployment_ready
+                mark_deployment_ready() 
+    
         else:
             # 🔨 개발 모드: 기존 방식 (단계별 로드)
             with st.spinner("🔨 개발 모드: 시스템을 단계별로 초기화합니다..."):
@@ -287,6 +296,8 @@ def main():
         
         if cn_count > 0 or vn_count > 0:
             st.info(f"📊 사용 가능: 🇨🇳 {cn_count}개, 🇻🇳 {vn_count}개 법률 문서")
+  
+    
     
     # 질문 입력
     st.markdown("### 💬 질문을 입력하세요")
