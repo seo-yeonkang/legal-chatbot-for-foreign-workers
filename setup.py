@@ -1,35 +1,37 @@
 # =============================================================================
-# setup.py - 배포 시점 사전 구축 스크립트
+# setup_models.py - 배포시 모든 모델 사전 다운로드 스크립트
 # =============================================================================
 
 import os
 import sys
+from pathlib import Path
 import gdown
 import zipfile
-import pickle
 import json
-from pathlib import Path
 from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import torch
+import faiss
+import pickle
+import argparse
 
-# 설정 임포트
+# 현재 디렉토리 설정
+current_dir = Path(__file__).parent
+sys.path.append(str(current_dir))
+
 import config
+from utils.embedding_index import load_jsonl_data, save_language_index
 
 def setup_directories():
     """필요한 디렉토리 생성"""
     print("📁 디렉토리 구조 생성 중...")
-    config.DATA_DIR.mkdir(exist_ok=True)
     config.MODELS_DIR.mkdir(exist_ok=True)
+    config.DATA_DIR.mkdir(exist_ok=True)
     print("✅ 디렉토리 생성 완료")
 
 def download_chinese_model():
-    """구글 드라이브에서 중국어 모델 다운로드"""
+    """중국어 모델 다운로드 및 설치"""
     print("📥 중국어 모델 다운로드 중...")
     
-    # 이미 있으면 건너뛰기
     if config.CHINESE_MODEL_LOCAL_PATH.exists():
         print("✅ 중국어 모델이 이미 존재합니다.")
         return True
@@ -37,25 +39,29 @@ def download_chinese_model():
     try:
         # 구글 드라이브에서 폴더 다운로드
         folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
+        print(f"📂 다운로드 URL: {folder_url}")
+        
         gdown.download_folder(folder_url, output=str(config.MODELS_DIR), quiet=False)
         
         # 폴더명 정리
-        downloaded_folder = config.CHINESE_MODEL_LOCAL_PATH
-        if not downloaded_folder.exists():
+        if not config.CHINESE_MODEL_LOCAL_PATH.exists():
             for folder in config.MODELS_DIR.iterdir():
                 if folder.is_dir() and folder.name != "chinese_model" and not folder.name.startswith("."):
-                    folder.rename(downloaded_folder)
+                    print(f"📂 폴더명 변경: {folder.name} → chinese_model")
+                    folder.rename(config.CHINESE_MODEL_LOCAL_PATH)
                     break
         
         # 다운로드 마커 생성
-        download_marker = config.MODELS_DIR / ".chinese_model_downloaded"
-        download_marker.touch()
+        (config.MODELS_DIR / ".chinese_model_downloaded").touch()
         
         print("✅ 중국어 모델 다운로드 완료")
         return True
         
     except Exception as e:
         print(f"❌ 중국어 모델 다운로드 실패: {e}")
+        print("💡 수동 다운로드 방법:")
+        print("   1. 구글 드라이브에서 chinese_model 폴더 다운로드")
+        print("   2. models/chinese_model/ 경로에 압축 해제")
         return False
 
 def download_vietnamese_model():
@@ -63,8 +69,11 @@ def download_vietnamese_model():
     print("📥 베트남어 모델 다운로드 중...")
     
     try:
-        # 모델과 토크나이저 다운로드 (캐시에 저장됨)
+        # HuggingFace에서 모델 다운로드 (캐시됨)
+        print(f"🤖 모델 다운로드: {config.VIETNAMESE_MODEL}")
         model = AutoModelForSeq2SeqLM.from_pretrained(config.VIETNAMESE_MODEL)
+        
+        print(f"🔤 토크나이저 다운로드: {config.VIETNAMESE_TOKENIZER}")
         tokenizer = AutoTokenizer.from_pretrained(config.VIETNAMESE_TOKENIZER)
         
         print("✅ 베트남어 모델 다운로드 완료")
@@ -74,189 +83,186 @@ def download_vietnamese_model():
         print(f"❌ 베트남어 모델 다운로드 실패: {e}")
         return False
 
-def build_embeddings_and_indexes():
-    """임베딩 모델 로드 및 FAISS 인덱스 구축"""
-    print("📚 임베딩 시스템 구축 중...")
+def build_embedding_indexes():
+    """임베딩 인덱스 사전 구축"""
+    print("🔍 임베딩 인덱스 구축 중...")
     
     try:
         # 임베딩 모델 로드
+        print(f"📊 임베딩 모델 로드: {config.EMBEDDING_MODEL}")
         embedding_model = SentenceTransformer(config.EMBEDDING_MODEL)
-        print("✅ 임베딩 모델 로드 완료")
         
         # 중국어 인덱스 구축
-        print("🇨🇳 중국어 법률 데이터 인덱싱 중...")
-        cn_success = build_language_index(
-            embedding_model, 'zh', 
-            config.CN_LAW_DATA_PATH,
-            config.CN_FAISS_INDEX_PATH,
-            config.CN_PASSAGES_PATH
-        )
-        
-        # 베트남어 인덱스 구축  
-        print("🇻🇳 베트남어 법률 데이터 인덱싱 중...")
-        vn_success = build_language_index(
-            embedding_model, 'vi',
-            config.VN_LAW_DATA_PATH, 
-            config.VN_FAISS_INDEX_PATH,
-            config.VN_PASSAGES_PATH
-        )
-        
-        if cn_success and vn_success:
-            print("✅ 모든 언어 인덱싱 완료")
-            return True
+        if config.CN_LAW_DATA_PATH.exists():
+            print("📚 중국어 법률 데이터 인덱싱...")
+            passages, metadata = load_jsonl_data(config.CN_LAW_DATA_PATH)
+            if passages:
+                print(f"   📄 처리할 문서: {len(passages)}개")
+                embeddings = embedding_model.encode(passages, show_progress_bar=True, batch_size=16)
+                faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+                faiss_index.add(embeddings.astype('float32'))
+                save_language_index(faiss_index, passages, metadata, 
+                                  config.CN_FAISS_INDEX_PATH, config.CN_PASSAGES_PATH)
+                print(f"✅ 중국어 인덱스 완료: {len(passages)}개 문서")
+            else:
+                print("⚠️ 중국어 법률 데이터가 비어있습니다.")
         else:
-            print("⚠️ 일부 언어 인덱싱 실패")
-            return False
-            
-    except Exception as e:
-        print(f"❌ 임베딩 시스템 구축 실패: {e}")
-        return False
-
-def build_language_index(embedding_model, language, jsonl_path, faiss_path, passages_path):
-    """특정 언어의 FAISS 인덱스 구축"""
-    try:
-        # 이미 존재하면 건너뛰기
-        if faiss_path.exists() and passages_path.exists():
-            print(f"✅ {language} 인덱스가 이미 존재합니다.")
-            return True
+            print(f"⚠️ 중국어 법률 데이터 파일 없음: {config.CN_LAW_DATA_PATH}")
         
-        # JSONL 데이터 로드
-        passages, metadata = load_jsonl_data(jsonl_path)
-        if not passages:
-            print(f"❌ {language} 데이터를 찾을 수 없습니다: {jsonl_path}")
-            return False
+        # 베트남어 인덱스 구축
+        if config.VN_LAW_DATA_PATH.exists():
+            print("📚 베트남어 법률 데이터 인덱싱...")
+            passages, metadata = load_jsonl_data(config.VN_LAW_DATA_PATH)
+            if passages:
+                print(f"   📄 처리할 문서: {len(passages)}개")
+                embeddings = embedding_model.encode(passages, show_progress_bar=True, batch_size=16)
+                faiss_index = faiss.IndexFlatL2(embeddings.shape[1])
+                faiss_index.add(embeddings.astype('float32'))
+                save_language_index(faiss_index, passages, metadata,
+                                  config.VN_FAISS_INDEX_PATH, config.VN_PASSAGES_PATH)
+                print(f"✅ 베트남어 인덱스 완료: {len(passages)}개 문서")
+            else:
+                print("⚠️ 베트남어 법률 데이터가 비어있습니다.")
+        else:
+            print(f"⚠️ 베트남어 법률 데이터 파일 없음: {config.VN_LAW_DATA_PATH}")
         
-        print(f"📄 {language} 문서 {len(passages)}개 임베딩 생성 중...")
+        # 완료 마커 생성
+        (config.DATA_DIR / ".indexes_built").touch()
         
-        # 임베딩 생성 (배치 처리)
-        embeddings = embedding_model.encode(
-            passages,
-            show_progress_bar=True,
-            batch_size=32,
-            normalize_embeddings=True
-        )
-        
-        # FAISS 인덱스 생성
-        dimension = embeddings.shape[1]
-        faiss_index = faiss.IndexFlatL2(dimension)
-        faiss_index.add(embeddings.astype('float32'))
-        
-        # 저장
-        faiss.write_index(faiss_index, str(faiss_path))
-        
-        with open(passages_path, 'wb') as f:
-            pickle.dump({
-                'passages': passages,
-                'metadata': metadata
-            }, f)
-        
-        print(f"✅ {language} 인덱스 저장 완료: {len(passages)}개 문서")
+        print("✅ 모든 임베딩 인덱스 구축 완료")
         return True
         
     except Exception as e:
-        print(f"❌ {language} 인덱스 구축 실패: {e}")
+        print(f"❌ 인덱스 구축 실패: {e}")
         return False
-
-def load_jsonl_data(jsonl_path):
-    """JSONL 파일에서 데이터 로드"""
-    passages = []
-    metadata = []
-    
-    try:
-        with open(jsonl_path, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                try:
-                    data = json.loads(line.strip())
-                    if "Trans_Sentence" in data:
-                        passages.append(data["Trans_Sentence"])
-                        metadata.append(data)
-                except json.JSONDecodeError:
-                    print(f"⚠️ Line {line_num}: JSON 파싱 오류")
-                    continue
-        
-        return passages, metadata
-        
-    except FileNotFoundError:
-        print(f"❌ 파일을 찾을 수 없습니다: {jsonl_path}")
-        return [], []
-
-def verify_setup():
-    """설정 완료 검증"""
-    print("🔍 설정 검증 중...")
-    
-    checks = []
-    
-    # 중국어 모델 확인
-    chinese_model_ok = config.CHINESE_MODEL_LOCAL_PATH.exists()
-    checks.append(("중국어 모델", chinese_model_ok))
-    
-    # 중국어 인덱스 확인
-    cn_index_ok = config.CN_FAISS_INDEX_PATH.exists() and config.CN_PASSAGES_PATH.exists()
-    checks.append(("중국어 인덱스", cn_index_ok))
-    
-    # 베트남어 인덱스 확인
-    vn_index_ok = config.VN_FAISS_INDEX_PATH.exists() and config.VN_PASSAGES_PATH.exists()
-    checks.append(("베트남어 인덱스", vn_index_ok))
-    
-    # 결과 출력
-    print("\n📋 설정 검증 결과:")
-    all_ok = True
-    for name, status in checks:
-        status_str = "✅" if status else "❌"
-        print(f"  {status_str} {name}: {'OK' if status else 'FAIL'}")
-        if not status:
-            all_ok = False
-    
-    return all_ok
 
 def create_deployment_marker():
     """배포 완료 마커 생성"""
-    marker_file = config.DATA_DIR / ".deployment_ready"
     marker_data = {
-        "timestamp": str(Path(__file__).stat().st_mtime),
-        "version": "1.0",
-        "chinese_model": str(config.CHINESE_MODEL_LOCAL_PATH),
-        "models_ready": True
+        "deployment_complete": True,
+        "chinese_model_ready": config.CHINESE_MODEL_LOCAL_PATH.exists(),
+        "indexes_built": (config.DATA_DIR / ".indexes_built").exists(),
+        "setup_version": "1.0",
+        "created_at": str(Path(__file__).stat().st_mtime)
     }
     
-    with open(marker_file, 'w') as f:
+    with open(config.BASE_DIR / ".deployment_ready", 'w') as f:
         json.dump(marker_data, f, indent=2)
     
-    print("✅ 배포 준비 완료 마커 생성됨")
+    print("✅ 배포 준비 완료 마커 생성")
+    print(f"📁 마커 파일: {config.BASE_DIR / '.deployment_ready'}")
+
+def check_requirements():
+    """필수 파일 및 설정 확인"""
+    print("🔍 필수 요구사항 확인 중...")
+    
+    errors = []
+    warnings = []
+    
+    # 데이터 파일 확인
+    if not config.CN_LAW_DATA_PATH.exists():
+        errors.append(f"중국어 법률 데이터 없음: {config.CN_LAW_DATA_PATH}")
+    
+    if not config.VN_LAW_DATA_PATH.exists():
+        errors.append(f"베트남어 법률 데이터 없음: {config.VN_LAW_DATA_PATH}")
+    
+    # 구글 드라이브 ID 확인
+    if not config.CHINESE_MODEL_GDRIVE_ID or config.CHINESE_MODEL_GDRIVE_ID == "your_google_drive_file_id":
+        errors.append("config.py에서 CHINESE_MODEL_GDRIVE_ID 설정 필요")
+    
+    # 토크나이저 설정 확인
+    if not config.VIETNAMESE_TOKENIZER or config.VIETNAMESE_TOKENIZER == "your-username/vietnamese-tokenizer":
+        warnings.append("config.py에서 VIETNAMESE_TOKENIZER 설정 권장")
+    
+    # 결과 출력
+    if errors:
+        print("❌ 필수 요구사항 오류:")
+        for error in errors:
+            print(f"   - {error}")
+        return False
+    
+    if warnings:
+        print("⚠️ 권장사항:")
+        for warning in warnings:
+            print(f"   - {warning}")
+    
+    print("✅ 필수 요구사항 확인 완료")
+    return True
 
 def main():
-    """메인 설정 함수"""
-    print("🚀 배포 시점 사전 구축 시작!")
-    print("=" * 50)
+    """메인 설정 프로세스"""
+    parser = argparse.ArgumentParser(description="법률 챗봇 배포 준비")
+    parser.add_argument("--skip-models", action="store_true", help="모델 다운로드 건너뛰기")
+    parser.add_argument("--skip-indexes", action="store_true", help="인덱스 구축 건너뛰기")
+    parser.add_argument("--force", action="store_true", help="기존 파일 덮어쓰기")
+    
+    args = parser.parse_args()
+    
+    print("🚀 법률 챗봇 배포 준비 시작...")
+    print("=" * 60)
+    
+    # 0. 필수 요구사항 확인
+    if not check_requirements():
+        print("❌ 필수 요구사항을 충족하지 않습니다. 설정을 확인해주세요.")
+        return False
+    
+    success_count = 0
+    total_steps = 4
     
     # 1. 디렉토리 생성
     setup_directories()
+    success_count += 1
     
     # 2. 중국어 모델 다운로드
-    if not download_chinese_model():
-        print("❌ 중국어 모델 다운로드 실패 - 수동 설정 필요")
-        return False
+    if not args.skip_models:
+        if download_chinese_model() or args.force:
+            success_count += 1
+        else:
+            print("⚠️ 중국어 모델 다운로드 실패, 계속 진행...")
+    else:
+        print("⏭️ 모델 다운로드 건너뛰기")
+        success_count += 1
     
     # 3. 베트남어 모델 다운로드
-    if not download_vietnamese_model():
-        print("❌ 베트남어 모델 다운로드 실패")
-        return False
+    if not args.skip_models:
+        if download_vietnamese_model() or args.force:
+            success_count += 1
+        else:
+            print("⚠️ 베트남어 모델 다운로드 실패, 계속 진행...")
+    else:
+        print("⏭️ 베트남어 모델 다운로드 건너뛰기")
+        success_count += 1
     
-    # 4. 임베딩 시스템 구축
-    if not build_embeddings_and_indexes():
-        print("❌ 임베딩 시스템 구축 실패")
-        return False
+    # 4. 임베딩 인덱스 구축
+    if not args.skip_indexes:
+        if build_embedding_indexes() or args.force:
+            success_count += 1
+        else:
+            print("⚠️ 인덱스 구축 실패, 계속 진행...")
+    else:
+        print("⏭️ 인덱스 구축 건너뛰기")
+        success_count += 1
     
-    # 5. 검증
-    if verify_setup():
-        create_deployment_marker()
-        print("\n🎉 배포 사전 구축 완료!")
-        print("이제 앱 실행 시 즉시 서비스가 시작됩니다.")
+    # 5. 배포 완료 마커 생성
+    create_deployment_marker()
+    
+    print("=" * 60)
+    print(f"📊 완료: {success_count}/{total_steps} 단계")
+    
+    if success_count == total_steps:
+        print("🎉 배포 준비 완료!")
+        print("✨ 이제 streamlit run app.py 실행시 즉시 시작됩니다.")
+        print("")
+        print("🚀 프로덕션 모드 테스트:")
+        print("   streamlit run app.py")
+        print("")
+        print("🔄 개발 모드로 되돌리기:")
+        print("   rm .deployment_ready")
         return True
     else:
-        print("\n❌ 일부 구성 요소가 누락되었습니다.")
+        print("⚠️ 일부 단계가 실패했습니다. 로그를 확인해주세요.")
         return False
 
 if __name__ == "__main__":
     success = main()
-    sys.exit(0 if success else 1)
+    exit(0 if success else 1)
