@@ -240,8 +240,6 @@ def main():
                 - 🇻🇳 베트남어 법률 문서: {vn_count}개
                 """)
 
-                st.session_state.embeddings_ready  = True
-                st.session_state.generation_ready  = True
             
                 from utils.common import mark_deployment_ready
                 mark_deployment_ready() 
