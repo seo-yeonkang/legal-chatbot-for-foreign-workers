@@ -2,63 +2,57 @@
 # utils/rag_prompt.py - RAG 프롬프트 구성
 # =============================================================================
 
-def build_prompt(question: str, retrieved_docs: list, language: str):
+
+def build_prompt(question: str, docs: list[dict], lang: str) -> str:
     """
-    RAG 프롬프트 구성
-    
-    Args:
-        question (str): 사용자 질문
-        retrieved_docs (list): 검색된 법률 조문들
-        language (str): 언어 ('zh' 또는 'vi')
-    
-    Returns:
-        str: 구성된 프롬프트
+    판례 기반 RAG 프롬프트
+    ─────────────────────────────────────────────────────
+    • 역할(Role)      : 한국 근로자 대상 노동법 상담 AI
+    • 컨텍스트(Context): 유사 판례 1–2건 (사건번호·선고일 포함)
+    • 출력(Output)    : ① 상황 요약 → ② 판례 핵심 → ③ 실무적 조언
     """
-    # 문서 텍스트 추출
-    if isinstance(retrieved_docs[0], dict):
-        doc_texts = [doc['text'] for doc in retrieved_docs]
-    else:
-        doc_texts = retrieved_docs
-    
-    # 법률 조문 포맷팅
-    formatted_docs = []
-    for i, doc in enumerate(doc_texts, 1):
-        formatted_docs.append(f"{i}. {doc.strip()}")
-    
-    joined_docs = "\n".join(formatted_docs)
-    
-    if language == "zh":
-        prompt = f"""请根据以下相关的韩国法律条文，用中文回答用户的法律咨询问题。请提供准确、实用的法律建议。
 
-相关法律条文：
-{joined_docs}
+    # ── 1. 판례 문단 포맷 ─────────────────────────────
+    case_lines = []
+    for i, d in enumerate(docs[:2], 1):                         # k ≤ 2
+        txt = d["text"].strip()
+        meta = d.get("metadata", {})                             # 사건번호·선고일 등
+        case_tag = meta.get("case_no", "") or meta.get("Unique_num", "")
+        date_tag = meta.get("date", "")
+        header = f"【판례 {i} {case_tag} {date_tag}】"
+        case_lines.append(f"{header}\n{txt[:250]}")              # 250자 이내
 
-用户问题：{question}
+    joined_cases = "\n\n".join(case_lines)
 
-请根据上述法律条文提供详细的中文回答："""
+    # ── 2. 언어별 틀 ─────────────────────────────
+    if lang == "zh":
+        role = "你是一位面向在韩工作的劳动者，精通韩国劳动法及相关判例的法律顾问。"
+        output_rule = (
+            "请遵守以下格式：\n"
+            "1. 【问题背景简述】(1–2 句)\n"
+            "2. 【相关判例】逐条列出要点，并在括号中写明判例编号\n"
+            "3. 【可行建议】给出实际可操作的建议，必要时提示咨询专业律师\n"
+            "回答字数约 5–7 句，不要透露内部推理过程。"
+        )
+    else:  # vi
+        role = "Bạn là cố vấn pháp luật chuyên về lao động tại Hàn Quốc, sử dụng các phán quyết làm cơ sở tham khảo."
+        output_rule = (
+            "Hãy trả lời theo cấu trúc:\n"
+            "1. 【Tóm tắt tình huống】(1–2 câu)\n"
+            "2. 【Phán quyết liên quan】 liệt kê ngắn gọn, ghi số vụ án trong ngoặc\n"
+            "3. 【Khuyến nghị thực tế】 nêu bước tiếp theo; khuyên liên hệ luật sư khi cần\n"
+            "Giữ độ dài 5–7 câu, không tiết lộ suy luận nội bộ."
+        )
 
-    elif language == "vi":
-        prompt = f"""Hãy dựa vào các điều luật Hàn Quốc liên quan dưới đây để trả lời câu hỏi tư vấn pháp luật của người dùng bằng tiếng Việt. Vui lòng cung cấp lời khuyên pháp lý chính xác và thực tế.
-
-Các điều luật liên quan:
-{joined_docs}
-
-Câu hỏi của người dùng: {question}
-
-Hãy cung cấp câu trả lời chi tiết bằng tiếng Việt dựa trên các điều luật trên:"""
-
-    else:
-        # 기본 영어 프롬프트
-        prompt = f"""Based on the following relevant Korean legal articles, please answer the user's legal consultation question. Provide accurate and practical legal advice.
-
-Relevant Legal Articles:
-{joined_docs}
-
-User Question: {question}
-
-Please provide a detailed answer based on the above legal articles:"""
-    
+    # ── 3. 최종 프롬프트 ─────────────────────────────
+    prompt = (
+        f"<system>\n{role}\n</system>\n\n"
+        f"<assistant>\n아래는 유사 판례 요약입니다:\n{joined_cases}\n</assistant>\n\n"
+        f"<user>\n{question}\n</user>\n\n"
+        f"<assistant>\n{output_rule}\n"
+    )
     return prompt
+
 
 def build_simple_prompt(question: str, language: str):
     """
