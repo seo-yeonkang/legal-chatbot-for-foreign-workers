@@ -27,6 +27,8 @@ from utils import (
 )
 from utils.embedding_index import search_similar_passages
 from utils.generator import load_generation_models
+import pickle
+import faiss
 
 # Streamlit 페이지 설정
 st.set_page_config(
@@ -94,35 +96,74 @@ with st.sidebar:
     st.markdown("- 🇨🇳 중국어 (Chinese)")
     st.markdown("- 🇻🇳 베트남어 (Vietnamese)")
     
-    # 캐시 상태 표시
+    # 배포 모드 상태 표시
     st.markdown("---")
     st.markdown("### ⚡ 시스템 상태")
     
-    if 'app_fully_initialized' in st.session_state:
-        st.success("✅ 캐시 활성화됨")
-        st.info("🚀 고속 모드")
+    if is_deployment_ready():
+        # 프로덕션 모드
+        st.success("🚀 프로덕션 모드")
+        st.info("⚡ 사전 구축 완료")
+        st.metric("🎯 모드", "즉시 시작", help="모든 모델이 사전 구축되어 즉시 시작")
         
-        # 캐시 초기화 버튼 (문제 발생시 사용)
-        if st.button("🔄 캐시 초기화", help="문제 발생시에만 사용하세요"):
-            # 모든 캐시 클리어
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.cache_resource.clear()
-            st.rerun()
+        # 배포 정보
+        marker_file = config.BASE_DIR / ".deployment_ready"
+        if marker_file.exists():
+            try:
+                import json
+                with open(marker_file, 'r') as f:
+                    data = json.load(f)
+                    setup_version = data.get("setup_version", "unknown")
+                    st.caption(f"Setup v{setup_version}")
+            except:
+                pass
     else:
-        st.warning("⏳ 초기화 중...")
+        # 개발 모드
+        st.warning("🔨 개발 모드")
+        st.info("📦 런타임 구축")
         
-    # 성능 팁
-    st.markdown("### 💡 성능 팁")
-    st.markdown("""
-    - **첫 실행**: 2-3분 소요 (모델 다운로드)
-    - **이후 실행**: 즉시 시작
-    - **문제시**: 캐시 초기화 버튼 사용
-    """)
+        if 'app_fully_initialized' in st.session_state:
+            st.success("✅ 캐시 활성화됨")
+            
+            # 캐시 초기화 버튼 (개발 모드에서만)
+            if st.button("🔄 캐시 초기화", help="문제 발생시에만 사용하세요"):
+                # 모든 캐시 클리어
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.cache_resource.clear()
+                st.rerun()
+        else:
+            st.warning("⏳ 초기화 중...")
+        
+        # 개발 도구
+        with st.expander("🛠️ 개발 도구"):
+            st.markdown("**프로덕션 모드로 전환하려면:**")
+            st.code("python setup_models.py", language="bash")
+            st.markdown("실행 후 앱을 재시작하세요.")
+    
+    # 성능 정보
+    st.markdown("### 📊 성능 정보")
+    
+    if is_deployment_ready():
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("🚀 시작 시간", "< 5초")
+        with col2:
+            st.metric("💾 저장 공간", "최적화됨")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            if 'app_fully_initialized' in st.session_state:
+                st.metric("⚡ 시작 시간", "10-15초")
+            else:
+                st.metric("⏳ 첫 시작", "2-3분")
+        with col2:
+            device = "GPU" if torch.cuda.is_available() else "CPU"
+            st.metric("💻 처리 장치", device)
     
     # 저장 공간 정보
     if 'app_fully_initialized' in st.session_state:
-        st.markdown("### 📊 저장 공간")
+        st.markdown("### 📊 데이터 현황")
         model_path = config.CHINESE_MODEL_LOCAL_PATH
         if model_path.exists():
             try:
@@ -130,53 +171,93 @@ with st.sidebar:
                 st.info(f"💾 모델 크기: {size_mb:.1f}MB")
             except:
                 st.info("💾 모델이 저장됨")
+        
+        # 인덱스 상태
+        if (config.CN_FAISS_INDEX_PATH.exists() and config.VN_FAISS_INDEX_PATH.exists()):
+            st.info("🔍 검색 인덱스: 준비됨")
 
 # 메인 콘텐츠
 def main():
-    # 시스템 초기화 (한 번만!)
+    # 시스템 초기화 (배포 모드 vs 개발 모드)
     if 'app_fully_initialized' not in st.session_state:
         
-        # 초기화 과정을 한 번만 보여주기
-        with st.spinner("🚀 법률 챗봇 시스템을 초기화하고 있습니다..."):
-            
-            # 1단계: 임베딩 시스템 로드
-            st.info("📚 1/2 단계: 법률 데이터베이스 준비 중...")
-            (embed_model, cn_index, cn_passages, cn_metadata, 
-             vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
-            
-            if embed_model is None:
-                st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
-                st.stop()
-            
-            # 2단계: 생성 모델 로드
-            st.info("🤖 2/2 단계: AI 모델 준비 중...")
-            chinese_model, vietnamese_model = load_generation_models()
-            
-            if chinese_model is None or vietnamese_model is None:
-                st.error("❌ 생성 모델 로드에 실패했습니다.")
-                st.stop()
-            
-            # 완전 초기화 마크
-            st.session_state.app_fully_initialized = True
-            
-            # 로드된 데이터 확인
-            cn_count = len(cn_passages) if cn_passages else 0
-            vn_count = len(vn_passages) if vn_passages else 0
-            
-            # 성공 메시지
-            st.balloons()  # 축하 효과!
-            st.success(f"""
-            🎉 **법률 챗봇 준비 완료!**
-            - 🇨🇳 중국어 법률 문서: {cn_count}개
-            - 🇻🇳 베트남어 법률 문서: {vn_count}개
-            - 💡 다음부터는 즉시 시작됩니다!
-            """)
+        # 배포 완료 상태 확인
+        if is_deployment_ready():
+            # 🚀 프로덕션 모드: 즉시 로드
+            with st.spinner("⚡ 프로덕션 모드: 시스템 즉시 로드 중..."):
+                
+                # 임베딩 시스템 즉시 로드
+                (embed_model, cn_index, cn_passages, cn_metadata, 
+                 vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
+                
+                if embed_model is None:
+                    st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
+                    st.stop()
+                
+                # 생성 모델 즉시 로드
+                chinese_model, vietnamese_model = load_generation_models()
+                
+                if chinese_model is None or vietnamese_model is None:
+                    st.error("❌ 생성 모델 로드에 실패했습니다.")
+                    st.stop()
+                
+                # 로드된 데이터 확인
+                cn_count = len(cn_passages) if cn_passages else 0
+                vn_count = len(vn_passages) if vn_passages else 0
+                
+                # 성공 메시지 (프로덕션 모드)
+                st.success(f"""
+                🚀 **프로덕션 모드: 즉시 시작!**
+                - ⚡ 사전 구축된 모델 로드 완료
+                - 🇨🇳 중국어 법률 문서: {cn_count}개
+                - 🇻🇳 베트남어 법률 문서: {vn_count}개
+                """)
+        
+        else:
+            # 🔨 개발 모드: 기존 방식 (단계별 로드)
+            with st.spinner("🔨 개발 모드: 시스템을 단계별로 초기화합니다..."):
+                
+                # 1단계: 임베딩 시스템 로드
+                st.info("📚 1/2 단계: 법률 데이터베이스 준비 중...")
+                (embed_model, cn_index, cn_passages, cn_metadata, 
+                 vn_index, vn_passages, vn_metadata) = load_embeddings_and_index()
+                
+                if embed_model is None:
+                    st.error("❌ 임베딩 시스템 로드에 실패했습니다.")
+                    st.stop()
+                
+                # 2단계: 생성 모델 로드
+                st.info("🤖 2/2 단계: AI 모델 준비 중...")
+                chinese_model, vietnamese_model = load_generation_models()
+                
+                if chinese_model is None or vietnamese_model is None:
+                    st.error("❌ 생성 모델 로드에 실패했습니다.")
+                    st.stop()
+                
+                # 로드된 데이터 확인
+                cn_count = len(cn_passages) if cn_passages else 0
+                vn_count = len(vn_passages) if vn_passages else 0
+                
+                # 성공 메시지 (개발 모드)
+                st.balloons()  # 축하 효과!
+                st.success(f"""
+                🎉 **개발 모드: 초기화 완료!**
+                - 🇨🇳 중국어 법률 문서: {cn_count}개
+                - 🇻🇳 베트남어 법률 문서: {vn_count}개
+                - 💡 프로덕션 배포시엔 즉시 시작됩니다!
+                """)
+        
+        # 완전 초기화 마크
+        st.session_state.app_fully_initialized = True
     
     else:
-        # 이미 초기화됨 - 즉시 시작
-        st.success("⚡ 법률 챗봇이 준비되었습니다! (캐시 사용)")
+        # 이미 초기화됨 - 상태 표시만
+        if is_deployment_ready():
+            st.success("🚀 프로덕션 모드: 법률 챗봇 준비 완료!")
+        else:
+            st.success("⚡ 개발 모드: 법률 챗봇 준비 완료! (캐시 사용)")
         
-        # 간단한 상태 확인만
+        # 간단한 상태 확인
         cn_count = len(st.session_state.cn_passages) if hasattr(st.session_state, 'cn_passages') and st.session_state.cn_passages else 0
         vn_count = len(st.session_state.vn_passages) if hasattr(st.session_state, 'vn_passages') and st.session_state.vn_passages else 0
         
