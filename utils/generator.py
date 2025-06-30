@@ -22,43 +22,43 @@ def get_sentence_transformer():
 
 
 def download_chinese_model_from_gdrive():
-    """Google Drive ZIP → 다운로드 → 압축 해제 → 최상단에 가중치 배치"""
+    """Google Drive 폴더 ID → 전체 다운로드 → 정리 후 경로 반환"""
     try:
-        # 이미 풀려 있으면 바로 반환
+        # ① 이미 설치돼 있으면 즉시 반환
         if config.CHINESE_MODEL_LOCAL_PATH.exists():
             return str(config.CHINESE_MODEL_LOCAL_PATH)
-        
+
+        # ② models/ 디렉터리 준비
         config.MODELS_DIR.mkdir(exist_ok=True)
 
-        zip_path = config.CHINESE_MODEL_ZIP_PATH
-        if not zip_path.exists():
-            st.info("📥 중국어 모델 ZIP 다운로드 중…")
-            url = f"https://drive.google.com/uc?id={config.CHINESE_MODEL_GDRIVE_ID}"
-            gdown.download(url, str(zip_path), quiet=False, fuzzy=True)  # fuzzy=True 안전
+        # ③ gdown으로 폴더 전체 다운로드
+        folder_url = f"https://drive.google.com/drive/folders/{config.CHINESE_MODEL_GDRIVE_ID}"
+        st.info("📥 중국어 모델 폴더 다운로드 중… (잠시 소요)")
 
-        # 압축 해제
-        st.info("🗜️ ZIP 압축 해제 중…")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(config.MODELS_DIR)
+        gdown.download_folder(
+            folder_url,
+            output=str(config.MODELS_DIR),     # models/ 아래로
+            quiet=False,
+            use_cookies=False                  # 권한 O(Anyone with link) 이면 강제 쿠키 불필요
+        )
 
-        # 압축 안에 chinese_model/ 폴더가 들어있다고 가정
+        # ④ 다운로드된 최상위 폴더를 chinese_model 로 맞추기
         if not config.CHINESE_MODEL_LOCAL_PATH.exists():
-            # case: ZIP 내부 폴더명이 다르면 첫 폴더를 chinese_model 로 변경
-            for folder in config.MODELS_DIR.iterdir():
-                if folder.is_dir() and folder.name != "chinese_model":
-                    folder.rename(config.CHINESE_MODEL_LOCAL_PATH)
+            for p in config.MODELS_DIR.iterdir():
+                if p.is_dir() and p.name != "chinese_model":
+                    p.rename(config.CHINESE_MODEL_LOCAL_PATH)
                     break
 
-        # (옵션) 가중치가 서브폴더에 있으면 끌어올리기
+        # ⑤ 서브폴더에 있을 수 있는 가중치 파일을 최상단으로 이동
         for root, _, files in os.walk(config.CHINESE_MODEL_LOCAL_PATH):
-            for fn in files:
-                if fn.endswith((".bin", ".safetensors")):
-                    src = Path(root) / fn
-                    dst = config.CHINESE_MODEL_LOCAL_PATH / fn
+            for fname in files:
+                if fname.endswith((".bin", ".safetensors")):
+                    src = Path(root) / fname
+                    dst = config.CHINESE_MODEL_LOCAL_PATH / fname
                     if not dst.exists():
                         src.replace(dst)
 
-        st.success("✅ 중국어 모델 준비 완료!")
+        st.success("✅ 중국어 모델 다운로드·정리 완료!")
         return str(config.CHINESE_MODEL_LOCAL_PATH)
 
     except Exception as e:
