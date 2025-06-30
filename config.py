@@ -4,6 +4,8 @@
 
 import os
 from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
 
 # 기본 경로 설정
 BASE_DIR = Path(__file__).parent
