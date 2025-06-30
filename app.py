@@ -1,4 +1,4 @@
-# =============================================================================
+ =============================================================================
 # app.py - 메인 Streamlit 앱
 # =============================================================================
 
@@ -25,7 +25,7 @@ from utils import (
     build_prompt,
     generate_answer
 )
-from utils.embedding_index import search_similar_passages
+from utils.embedding_index import search_similar_passages, is_deployment_ready
 from utils.generator import load_generation_models
 import pickle
 import faiss
@@ -100,7 +100,25 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### ⚡ 시스템 상태")
     
-    if is_deployment_ready():
+    # Streamlit Cloud 특별 표시
+    if config.STREAMLIT_CLOUD:
+        st.info("☁️ Streamlit Cloud")
+        st.caption("경량 모델 사용 중")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("💾 메모리", "제한됨")
+        with col2:
+            st.metric("🚀 모드", "경량화")
+        
+        with st.expander("ℹ️ Streamlit Cloud 정보"):
+            st.markdown("""
+            - **메모리 제한**: 1GB
+            - **경량 모델**: 성능 최적화됨
+            - **무료 호스팅**: 24/7 서비스
+            """)
+            
+    elif is_deployment_ready():
         # 프로덕션 모드
         st.success("🚀 프로덕션 모드")
         st.info("⚡ 사전 구축 완료")
@@ -144,7 +162,13 @@ with st.sidebar:
     # 성능 정보
     st.markdown("### 📊 성능 정보")
     
-    if is_deployment_ready():
+    if config.STREAMLIT_CLOUD:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("⚡ 시작 시간", "< 10초")
+        with col2:
+            st.metric("🧠 모델", "경량화")
+    elif is_deployment_ready():
         col1, col2 = st.columns(2)
         with col1:
             st.metric("🚀 시작 시간", "< 5초")
@@ -162,7 +186,7 @@ with st.sidebar:
             st.metric("💻 처리 장치", device)
     
     # 저장 공간 정보
-    if 'app_fully_initialized' in st.session_state:
+    if 'app_fully_initialized' in st.session_state and not config.STREAMLIT_CLOUD:
         st.markdown("### 📊 데이터 현황")
         model_path = config.CHINESE_MODEL_LOCAL_PATH
         if model_path.exists():
