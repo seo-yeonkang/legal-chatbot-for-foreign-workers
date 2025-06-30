@@ -105,7 +105,7 @@ def load_embeddings_and_index():
 # is_deployment_ready 함수 추가 (generator.py에서 이동)
 def is_deployment_ready():
     """배포 준비가 완료되었는지 확인"""
-    marker_file = config.BASE_DIR / ".deployment_ready"
+    marker_file = config.MODELS_DIR / ".deployment_ready"
     if marker_file.exists():
         try:
             import json
