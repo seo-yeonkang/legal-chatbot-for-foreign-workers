@@ -270,6 +270,12 @@ def process_question(question: str):
     if 'vn_index' not in st.session_state or 'cn_index' not in st.session_state:
         st.warning("🔄 시스템이 아직 완전히 초기화되지 않았습니다. 잠시만 기다려 주세요.")
         return
+        
+    if ('chinese_model' not in st.session_state or
+        'vietnamese_model' not in st.session_state):
+        chinese_model, vietnamese_model = load_generation_models()
+        st.session_state.chinese_model     = chinese_model
+        st.session_state.vietnamese_model  = vietnamese_model
     
     try:
         # 언어 감지
