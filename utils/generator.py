@@ -149,7 +149,7 @@ def generate_answer(prompt: str, model, tokenizer, max_length: int = None, tempe
 
             outputs = model.generate(
                 **inputs,
-                max_length = max_length or config.MAX_GENERATION_LENGTH,
+                max_length = 128,
                 temperature = temperature or config.TEMPERATURE,
                 top_p = config.TOP_P,
                 do_sample = (temperature or 0) > 0,
