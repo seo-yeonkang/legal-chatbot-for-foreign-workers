@@ -34,7 +34,7 @@ CHINESE_MODEL_FOLDER_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
 
 # 베트남어 모델 (외부 모델 + 커스텀 토크나이저)
 VIETNAMESE_MODEL = "google/mt5-small"
-VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese-tokenizer"  # HF Hub의 커스텀 토크나이저
+VIETNAMESE_TOKENIZER = "seo-yeonkang/legal-chatbot-for-foreign-workers/models/vietnamese-tokenizer" 
 
 # 생성 설정
 MAX_RETRIEVED_DOCS = 3
@@ -46,3 +46,4 @@ TOP_P = 0.9
 # Streamlit 설정
 PAGE_TITLE = "외국인 근로자 법률 챗봇"
 PAGE_ICON = "⚖️"
+
