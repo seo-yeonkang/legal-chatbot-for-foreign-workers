@@ -27,7 +27,7 @@ EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # 중국어 모델 (Streamlit Cloud 최적화)
 # 메모리 제한으로 인해 더 작은 모델 사용 권장
-CHINESE_MODEL_GDRIVE_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJWcQ"  # 폴더 ID
+CHINESE_MODEL_GDRIVE_ID = "1MYuh7dM_w_-292VBHFNaoSD57_mJJWcQ"  # 폴더 ID
 CHINESE_MODEL_LOCAL_PATH = MODELS_DIR / "chinese_model"
 CHINESE_MODEL_ZIP_PATH = MODELS_DIR / "chinese_model.zip"
 
